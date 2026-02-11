@@ -1,8 +1,0 @@
-interface:
-  display_name: "JS 逆向自动化"
-  short_description: "MCP 浏览器+JSRPC+Flask+Burp 的签名/加密自动化流程"
-  default_prompt: |
-    1、目标网址（完整 URL）： 
-    2、需要分析的加密参数名（如 sign / enc / token）： 
-    3、可复现请求示例（优先给 fetch/抓包原始请求）： 
-    4、环境限制（浏览器版本、是否需要代理/插件、是否允许注入）：
