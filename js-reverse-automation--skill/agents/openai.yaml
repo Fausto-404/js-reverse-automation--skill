@@ -1,3 +1,0 @@
-display_name: JS 逆向自动化
-short_description: MCP 浏览器+JSRPC+Flask+Burp 的签名/加密自动化流程
-default_prompt: 通过 MCP 连接浏览器，定位加密/签名入口，生成 JSRPC 与 Flask 代理，并输出 Burp autoDecoder 配置。
