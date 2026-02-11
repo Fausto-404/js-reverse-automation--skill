@@ -8,3 +8,17 @@ https://xz.aliyun.com/news/91527
 
 # 20260203更新
 优化该项目的结构，可以直接导入Claude、Codex、trae等支持Skills的模型和平台（按需修改agent下的文件）
+
+# 20260211更新
+新增 11 个补充技能目录，覆盖 AntiDebug_Breaker 的核心反调试与加密观察能力：
+- Bypass Debugger
+- hook log
+- Hook table
+- hook clear
+- hook close
+- hook history
+- Fixed window size
+- Hook Promise
+- 页面跳转JS代码定位通杀方案
+- Hook CryptoJS
+- Hook JSEncrypt RSA
