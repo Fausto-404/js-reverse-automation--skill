@@ -29,7 +29,7 @@ https://xz.aliyun.com/news/91527
 ## 使用示意
 这边演示使用的是codex5.3（其他平台同理）
 
-1、下载skills放置在codex的skills目录中，mac端的路径为/Users/用户名/.codex/skills/
+1、下载skills放置在codex的skills目录中，mac端的路径为`/Users/用户名/.codex/skills/`
 <img width="822" height="290" alt="image" src="https://github.com/user-attachments/assets/400d26de-8571-412a-bf5c-894ba8041fbd" />
 
 2、将chrome-devtools-mcp服务写进 Codex 的配置
@@ -39,33 +39,39 @@ https://xz.aliyun.com/news/91527
  ```
 <img width="2464" height="216" alt="image" src="https://github.com/user-attachments/assets/0a3bd8c8-9029-4d8c-9f50-f91fb5ac4e4e" />
 
-3、修改 Codex 的配置文件MAC的在~/.codex/config.toml，添加如下字段
+3、修改 Codex 的配置文件MAC的在`~/.codex/config.toml`，添加如下字段
+
 ```
 [mcp_servers.chrome-devtools]
 command = "npx"
 args = ["-y", "chrome-devtools-mcp@latest"]
 ```
+
 <img width="1848" height="892" alt="image" src="https://github.com/user-attachments/assets/b2f8a0a9-2ab1-44a1-baf6-5b57d20076b5" />
 
 4、检测是否生效
 <img width="2524" height="722" alt="image" src="https://github.com/user-attachments/assets/0dfd71ad-7b03-4eb3-a99a-8c11990dcf72" />
 
 5、启动mcp服务，当看到打开浏览器后MCP服务就配置好了。
+
 ```
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
     --remote-debugging-port=9222 \
     --remote-debugging-address=0.0.0.0
 ```
+
 <img width="2374" height="996" alt="image" src="https://github.com/user-attachments/assets/7a2336ee-1d7a-4ead-99c3-9faa00bc18bc" />
 6、在codex客户端中使用该skills
 <img width="2126" height="1548" alt="image" src="https://github.com/user-attachments/assets/5b63f167-e2c2-4686-b28f-3558f18f6012" />
 7、输入所需要的信息
+
 ```
 1、目标网址（完整 URL）： 
 2、需要分析的加密参数名（如 sign / enc / token）： 
 3、可复现请求示例（优先给 fetch/抓包原始请求）： 
 4、环境限制（浏览器版本、是否需要代理/插件、是否允许注入）：
 ```
+
 <img width="1546" height="410" alt="image" src="https://github.com/user-attachments/assets/bdc49469-5a09-4ac4-871a-02cdd78d1bdb" />
 8、等待程序运行完成即可
 <img width="1494" height="1258" alt="image" src="https://github.com/user-attachments/assets/f50dfe64-8690-42e9-8230-25056b5a84bf" />
@@ -83,9 +89,11 @@ args = ["-y", "chrome-devtools-mcp@latest"]
 <img width="1746" height="1320" alt="image" src="https://github.com/user-attachments/assets/b00c2261-ee26-4b88-a408-e0faaba84079" />
 
 4、测试jsrpc调用函数是否正常，可以看到是没问题的。
+
 ```
 http://127.0.0.1:12080/go?group=fausto&action=generate_password_md5&param=111111
 ```
+
 <img width="2402" height="1056" alt="image" src="https://github.com/user-attachments/assets/5da1563a-84d7-4d6f-b83e-81106bed90a5" />
 
 5、运行flask_proxy_hr_ncu.py
@@ -93,11 +101,13 @@ http://127.0.0.1:12080/go?group=fausto&action=generate_password_md5&param=111111
 <img width="1744" height="1322" alt="image" src="https://github.com/user-attachments/assets/9b70a477-2b12-464d-8450-822320556c95" />
 
 6、测试Flask是否可以正常加密，可以看到也是没问题的。
+
 ```
 curl -X POST http://127.0.0.1:8888/encode \
   -H "Content-Type: application/x-www-form-urlencoded" \
   --data-urlencode "dataBody=username=111111&password=111111&code=1234&role=000002"
 ```
+
 <img width="2508" height="1092" alt="image" src="https://github.com/user-attachments/assets/a9001881-b303-4c6c-a4bf-03f32576e44b" />
 
 7、最后根据Burp autoDecoder 配置说明配置burp的autoDecoder插件，也成功加密了参数，整体成功运行完成
