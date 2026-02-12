@@ -1,26 +1,73 @@
-# 实操请参考先知社区原文链接
-https://xz.aliyun.com/news/91527
 # js-reverse-automation--skill
 结合chrome-devtools-mcp的能力并加上Skill的规范，实现JSRPC+Flask+autoDecoder方案的前端JS逆向自动化分析，提升JS逆向的效率
-# 流程设计
-针对远程调用法进行js逆向（如JSRPC+Mitmproxy、JSRPC+Flask等）中，初始配置阶段中面对的定位加密函数、编写注册代码、编写python代码等繁琐操作，通过引入AI的MCP和Skill技术进行赋能，让AI自动完成函数发现与注册代码生成，最终实现从“半自动”到“高自动”的跨越，人员全程只需下方指令，并最终配置一下burp即可完成JS逆向的全流程。
+
+## 流程设计思路
+针对js逆向中常用的远程调用法进行js逆向（如JSRPC+Mitmproxy、JSRPC+Flask等）中，初始配置阶段中面对的定位加密函数、编写注册代码、编写python代码等繁琐操作，通过引入AI的MCP和Skill技术进行赋能，让AI自动完成函数发现与注册代码生成，最终实现从“半自动”到“高自动”的跨越，人员全程只需下方指令，并最终配置一下burp即可完成JS逆向的全流程。
 <img width="2064" height="1108" alt="image" src="https://github.com/user-attachments/assets/fc13f276-f667-486a-8506-221c0c55507e" />
 
-# 20260203更新
-优化该项目的结构，可以直接导入Claude、Codex、trae等支持Skills的模型和平台（按需修改agent下的文件）
+## 核心能力
+- 基于 MCP 连接真实浏览器，触发并跟踪js加密/签名链路
+- 自动定位 `sign / enc / token` 等关键参数生成入口
+- 自动生成 JSRPC 注入与注册代码
+- 自动生成 Python Flask 代理代码
+- 输出 Burp `autoDecoder` 对接说明，支持端到端联调
+- 支持AntiDebug_Breaker的11项反调试能力
+## 使用示意
+这边演示使用的是codex5.3（其他平台同理）
 
-# 20260211更新
-新增 11 个补充技能目录，覆盖 AntiDebug_Breaker 的核心反调试与加密观察能力：
-- Bypass Debugger
-- hook log
-- Hook table
-- hook clear
-- hook close
-- hook history
-- Fixed window size
-- Hook Promise
-- 页面跳转JS代码定位通杀方案
-- Hook CryptoJS
-- Hook JSEncrypt RSA
+1、下载skills放置在codex的skills目录中，mac端的路径为/Users/用户名/.codex/skills/
+<img width="822" height="290" alt="image" src="https://github.com/user-attachments/assets/400d26de-8571-412a-bf5c-894ba8041fbd" />
 
-识别到需要的反调试技能可使用https://github.com/0xsdeo/AntiDebug_Breaker 插件进行反调试对抗
+2、将chrome-devtools-mcp服务写进 Codex 的配置
+
+ ```
+ codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
+ ```
+<img width="2464" height="216" alt="image" src="https://github.com/user-attachments/assets/0a3bd8c8-9029-4d8c-9f50-f91fb5ac4e4e" />
+
+3、修改 Codex 的配置文件MAC的在~/.codex/config.toml，添加如下字段
+```
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@latest"]
+```
+<img width="1848" height="892" alt="image" src="https://github.com/user-attachments/assets/b2f8a0a9-2ab1-44a1-baf6-5b57d20076b5" />
+
+3、检测是否生效
+<img width="2524" height="722" alt="image" src="https://github.com/user-attachments/assets/0dfd71ad-7b03-4eb3-a99a-8c11990dcf72" />
+
+4、启动mcp服务，当看到打开浏览器后MCP服务就配置好了。
+```
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+    --remote-debugging-port=9222 \
+    --remote-debugging-address=0.0.0.0
+```
+<img width="2374" height="996" alt="image" src="https://github.com/user-attachments/assets/7a2336ee-1d7a-4ead-99c3-9faa00bc18bc" />
+5、在codex客户端中使用该skills
+<img width="2126" height="1548" alt="image" src="https://github.com/user-attachments/assets/5b63f167-e2c2-4686-b28f-3558f18f6012" />
+6、输入所需要的信息
+```
+1、目标网址（完整 URL）： 
+2、需要分析的加密参数名（如 sign / enc / token）： 
+3、可复现请求示例（优先给 fetch/抓包原始请求）： 
+4、环境限制（浏览器版本、是否需要代理/插件、是否允许注入）：
+```
+<img width="1546" height="410" alt="image" src="https://github.com/user-attachments/assets/bdc49469-5a09-4ac4-871a-02cdd78d1bdb" />
+7、等待程序运行完成即可
+<img width="1494" height="1258" alt="image" src="https://github.com/user-attachments/assets/f50dfe64-8690-42e9-8230-25056b5a84bf" />
+8、生成的内容如何进行配置可参考 https://xz.aliyun.com/news/91527
+
+## 适用场景
+
+- 需要快速落地前端签名/加密参数逆向
+- 需要将js逆向逻辑封装为可复用的代码
+- 需要与 Burp 配合进行抓包、改包
+
+## 更新日志
+
+### 2026-02-03
+- 优化项目结构，支持直接导入 Claude、Codex、Trae 等支持 Skills 的平台（`agents/` 目录可按需调整）。
+
+### 2026-02-11
+- 新增 11 个反调试补充技能，完善对复杂目标的反调试对抗能力。
+
