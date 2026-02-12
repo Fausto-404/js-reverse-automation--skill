@@ -62,7 +62,11 @@ args = ["-y", "chrome-devtools-mcp@latest"]
 - 需要快速落地前端签名/加密参数逆向
 - 需要将js逆向逻辑封装为可复用的代码
 - 需要与 Burp 配合进行抓包、改包
-
+## 引用工具
+- JsRpc：https://github.com/jxhczhl/JsRpc 
+- autoDecoder：https://github.com/f0ng/autoDecoder 
+- chrome-devtools-mcp：https://github.com/ChromeDevTools/chrome-devtools-mcp/ 
+- AntiDebug：https://github.com/0xsdeo/AntiDebug_Breaker
 ## 更新日志
 
 ### 2026-02-03
