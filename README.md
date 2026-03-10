@@ -112,7 +112,7 @@ args = ["-y", "chrome-devtools-mcp@latest"]
 
 
 
-2、在浏览器开发者工具的Console中，执行JSRpc项目中的 JsEnv_Dev.js文件内容。
+2、在浏览器开发者工具的Console中，执行`js-reverse-automation/scripts/JsEnv_Dev.js`文件中内容。
 <img width="1980" height="1332" alt="image" src="https://github.com/user-attachments/assets/d2d7a299-f354-459c-b624-9d7d95abe130" />
 
 3、在控制台注入AI生成的jsrpc_inject_hr_ncu_password.js。
