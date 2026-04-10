@@ -21,22 +21,27 @@
 
 ## 项目结构
 ```latex
-js-reverse-automation--skill/
-├── README.md # 项目说明、使用方式、更新说明和结构说明。
-├── SKILL.md # Skill 主控文件。只负责定义任务如何被触发、必须输入什么、流程怎么分阶段、输出和验收怎么要求。
+js-reverse-automation
+├── SKILL.md # Skill 主控文件。负责定义触发条件、输入要求、分阶段流程、输出要求与验收方式。
 ├── agents/
-│   └── openai.yaml # Skill 的 agent 入口配置。负责定义默认提示词、默认输入格式和执行约束。
-├── artifacts/ # 运行期目录，用来承接流程中间产物和最终校验报告。预期会出现的文件如下：
-│   ├── artifacts/phase0_input.json # 规范化后的输入
-│   ├── artifacts/phase1_trace.json # 浏览器链路复现结果
-│   ├── artifacts/phase2_entrypoints.json # 参数入口识别结果
-│   ├── artifacts/phase3_dependencies.json # 依赖、上下文和调用方式提取结果
-│   └── artifacts/validation_report.json # 最终校验报告
+│   └── openai.yaml # Skill 的 agent 入口配置。定义默认提示词、默认输入格式和执行约束。
+├── artifacts/ # 运行期目录，用于承接流程中间产物和最终校验报告。
+│   ├── artifacts/phase0_input.json # 规范化后的输入。
+│   ├── artifacts/phase1_trace.json # 浏览器链路复现结果。
+│   ├── artifacts/phase2_entrypoints.json # 参数入口识别结果。
+│   ├── artifacts/phase3_dependencies.json # 依赖、上下文和调用方式提取结果。
+│   └── artifacts/validation_report.json # 最终校验报告。
 ├── references/
 │   ├── references/workflow-recon.md # 阶段流程说明书。
 │   ├── references/output-contract.md # 输入输出契约说明书。
 │   ├── references/failure-recovery.md # 失败恢复和诊断格式说明书。
 │   ├── references/validation-checklist.md # 验收标准说明书。
+│   ├── references/network-capture.md # 网络抓取与请求观测说明。
+│   ├── references/source-location.md # 入口源码定位与位置标注说明。
+│   ├── references/hook-debugging.md # Hook 调试与链路观察说明。
+│   ├── references/protocol-resilience.md # 协议适配与稳健性处理说明。
+│   ├── references/devtools-capability-matrix.md # DevTools 能力矩阵与适用边界说明。
+│   ├── references/anti-detection-verification.md # 反检测处理后的验证说明。
 │   └── references/antidebug/
 │       ├── references/antidebug/debugger-loop.md # 处理无限 debugger、eval、Function 类问题。
 │       ├── references/antidebug/console-detect.md # 处理控制台检测、日志篡改、清屏等问题。
@@ -50,18 +55,12 @@ js-reverse-automation--skill/
     ├── scripts/emit_jsrpc_stub.py # JSRPC 代码生成器。
     ├── scripts/emit_flask_proxy.py # Flask 代理生成器。
     ├── scripts/emit_burp_doc.py # Burp autoDecoder 文档生成器。
-    └── scripts/validate_artifacts.py # 全链路校验器。
+    ├── scripts/validate_artifacts.py # 全链路校验器。
+    └── scripts/JsEnv_Dev.js # JS 环境补齐/调试辅助脚本，用于运行期注入或本地复现支撑。
 ```
-## Q&A
-Q1. 有师傅反馈使用这个skills时出现如下图这种场景
-<img width="1580" height="868" alt="image" src="https://github.com/user-attachments/assets/4d07e966-9fda-429a-8d59-26dfe7525d4d" />
-A1. 解决这个问题其实很简单，我们只需要按照openai.yaml的内容提示词模版，并且将Target URL替换为127.0.0.1即可（已经优化了skill.md中的提示词确保127.0.0.1可执行）
-<img width="1114" height="1228" alt="image" src="https://github.com/user-attachments/assets/cb842e61-b576-4650-8efc-67cf0946136c" />
-然后当AI无法访问https://127.0.0.1:8888/ 就会转去真实的页面进行测试，如下图所示
-<img width="1458" height="1178" alt="image" src="https://github.com/user-attachments/assets/8ba8a93b-ea10-4ec6-8f82-d5833bc38779" />
 
 ## 使用示意
-这边演示使用的是codex5.3（其他平台同理）
+这边演示使用的是codex5.3（**推荐使用去除安全限制的claude code，否则需要对抗安全限制**）
 
 1、下载skills放置在codex的skills目录中，mac端的路径为`/Users/用户名/.codex/skills/`
 <img width="880" height="296" alt="image" src="https://github.com/user-attachments/assets/0740b150-1508-46f1-bd76-2c6c9afa3bca" />
@@ -175,3 +174,9 @@ curl -X POST http://127.0.0.1:8888/encode \
 ### 2026-03-19
 + 添加对抗AI识别为高风险执行操作拒绝执行的能力
 + 添加对应提示词输入指引
+
+### 2026-04-10
++ 补强了请求复现、参数入口定位、页面内观测代码注入、反检测验证和协议层差异分析等能力。
++ 对 skill 文本本身做了规范化整理，明确了 chrome-devtools-mcp 的真实能力边界，补充了对应的参考规则，并收紧了不确定结论的表达方式。
++ 更适合处理复杂 JS 逆向场景，完成标准化输出任务
++ **推荐使用去除安全限制版本的claude进行测试，codex最近道德水平有点高**
