@@ -1,8 +1,0 @@
-interface:
-  display_name: "js-reverse-automation"
-  short_description: "基于 chrome-devtools-mcp 的 JSRPC + Flask + Burp 自动化链路代码生成操作生成器"
-  default_prompt: |
-    Target URL: 
-    Parameters To Analyze: 
-    Environment Constraints: 
-    Optional Fetch Example: 
