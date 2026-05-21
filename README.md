@@ -26,37 +26,39 @@ js-reverse-automation
 ├── agents/
 │   └── openai.yaml # Skill 的 agent 入口配置。定义默认提示词、默认输入格式和执行约束。
 ├── artifacts/ # 运行期目录，用于承接流程中间产物和最终校验报告。
-│   ├── artifacts/phase0_input.json # 规范化后的输入。
-│   ├── artifacts/phase1_trace.json # 浏览器链路复现结果。
-│   ├── artifacts/phase2_entrypoints.json # 参数入口识别结果。
-│   ├── artifacts/phase3_dependencies.json # 依赖、上下文和调用方式提取结果。
-│   └── artifacts/validation_report.json # 最终校验报告。
+│   ├── phase0_input.json # 规范化后的输入。
+│   ├── phase1_trace.json # 浏览器链路复现结果。
+│   ├── phase2_entrypoints.json # 参数入口识别结果。
+│   ├── phase3_dependencies.json # 依赖、上下文和调用方式提取结果。
+│   └── validation_report.json # 最终校验报告。
 ├── references/
-│   ├── references/workflow-recon.md # 阶段流程说明书。
-│   ├── references/output-contract.md # 输入输出契约说明书。
-│   ├── references/failure-recovery.md # 失败恢复和诊断格式说明书。
-│   ├── references/validation-checklist.md # 验收标准说明书。
-│   ├── references/network-capture.md # 网络抓取与请求观测说明。
-│   ├── references/source-location.md # 入口源码定位与位置标注说明。
-│   ├── references/hook-debugging.md # Hook 调试与链路观察说明。
-│   ├── references/protocol-resilience.md # 协议适配与稳健性处理说明。
-│   ├── references/devtools-capability-matrix.md # DevTools 能力矩阵与适用边界说明。
-│   ├── references/anti-detection-verification.md # 反检测处理后的验证说明。
-│   └── references/antidebug/
-│       ├── references/antidebug/debugger-loop.md # 处理无限 debugger、eval、Function 类问题。
-│       ├── references/antidebug/console-detect.md # 处理控制台检测、日志篡改、清屏等问题。
-│       ├── references/antidebug/timer-check.md # 处理时间差、性能计时、Promise 时序检测。
-│       ├── references/antidebug/env-detect.md # 处理窗口大小、webdriver、UA、DevTools 检测等环境识别问题。
-│       ├── references/antidebug/proxy-guard.md # 处理跳转、关闭页面、history、代理拦截等链路阻断问题。
-│       └── references/antidebug/dynamic-alias.md # 处理动态别名、wrapper、resolver 型入口和不稳定路径。
+│   ├── workflow-recon.md # 阶段流程说明书。
+│   ├── output-contract.md # 输入输出契约说明书。
+│   ├── failure-recovery.md # 失败恢复和诊断格式说明书。
+│   ├── validation-checklist.md # 验收标准说明书。
+│   ├── network-capture.md # 网络抓取与请求观测说明。
+│   ├── source-location.md # 入口源码定位与位置标注说明。
+│   ├── hook-debugging.md # Hook 调试与链路观察说明。
+│   ├── protocol-resilience.md # 协议适配与稳健性处理说明。
+│   ├── devtools-capability-matrix.md # DevTools 能力矩阵与适用边界说明。
+│   ├── anti-detection-verification.md # 反检测处理后的验证说明。
+│   ├── evolution_matrix.json # 长期经验记忆库，支持跨任务策略继承与经验沉淀。
+│   └── antidebug/
+│       ├── debugger-loop.md # 处理无限 debugger、eval、Function 类问题。
+│       ├── console-detect.md # 处理控制台检测、日志篡改、清屏等问题。
+│       ├── timer-check.md # 处理时间差、性能计时、Promise 时序检测。
+│       ├── env-detect.md # 处理窗口大小、webdriver、UA、DevTools 检测等环境识别问题。
+│       ├── proxy-guard.md # 处理跳转、关闭页面、history、代理拦截等链路阻断问题。
+│       └── dynamic-alias.md # 处理动态别名、wrapper、resolver 型入口和不稳定路径。
 └── scripts/
-    ├── scripts/check_inputs.py # 输入校验器。
-    ├── scripts/emit_analysis_result.py # 统一分析产物生成器。
-    ├── scripts/emit_jsrpc_stub.py # JSRPC 代码生成器。
-    ├── scripts/emit_flask_proxy.py # Flask 代理生成器。
-    ├── scripts/emit_burp_doc.py # Burp autoDecoder 文档生成器。
-    ├── scripts/validate_artifacts.py # 全链路校验器。
-    └── scripts/JsEnv_Dev.js # JS 环境补齐/调试辅助脚本，用于运行期注入或本地复现支撑。
+    ├── check_inputs.py # 输入校验器。
+    ├── emit_analysis_result.py # 统一分析产物生成器。
+    ├── emit_jsrpc_stub.py # JSRPC 代码生成器。
+    ├── emit_flask_proxy.py # Flask 代理生成器.
+    ├── emit_burp_doc.py # Burp autoDecoder 文档生成器。
+    ├── validate_artifacts.py # 全链路校验器。
+    ├── update_evolution_library.py # 经验库增量更新与长期记忆写入器。
+    └── JsEnv_Dev.js # JS 环境补齐/调试辅助脚本，用于运行期注入或本地复现支撑。
 ```
 
 ## 使用示意
@@ -180,3 +182,9 @@ curl -X POST http://127.0.0.1:8888/encode \
 + 对 skill 文本本身做了规范化整理，明确了 chrome-devtools-mcp 的真实能力边界，补充了对应的参考规则，并收紧了不确定结论的表达方式。
 + 更适合处理复杂 JS 逆向场景，完成标准化输出任务
 + **推荐使用去除安全限制版本的claude进行测试，codex最近道德水平有点高**
+### 2026-05-21
++ **让skills越用越聪明**
++ 引入 Phase 9 经验沉淀与对抗库演进流程，新增跨任务长期经验记忆库 references/evolution_matrix.json。
++ 支持注册主域名级别的 Action 名称与 Flask 路由绑定记忆跨任务继承，实现动态特征对齐和老策略失效时强制阻断回滚。
++ 引入模块化经验模型，将自动化逆向攻防策略解耦并持久化为结构化知识：
++ 新增 scripts/update_evolution_library.py 经验库写入器，采用文件锁（fcntl）与临时文件原子替换机制，全面保障跨并发与异常中断下的数据完整性。
