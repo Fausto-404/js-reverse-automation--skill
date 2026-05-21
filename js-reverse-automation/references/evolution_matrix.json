@@ -1,0 +1,44 @@
+{
+  "domains": {
+    "example.com": {
+      "last_action_name": "generate_password_md5",
+      "route": "/encode",
+      "last_behavioral_features": [
+        "obfuscation_vmp_type_1"
+      ],
+      "last_validation_fingerprint": "sha256:example",
+      "updated_at": "2026-05-21",
+      "notes": "该域名存在特定的本地证书错或端口占用，优先走真实页面"
+    }
+  },
+  "behavioral_features": {
+    "obfuscation_vmp_type_1": {
+      "fingerprint_keywords": [
+        "$super",
+        "callee",
+        "__vmp"
+      ],
+      "successful_patch_strategy": "硬编码路径会失效，必须使用 resolver 策略进行动态导出",
+      "failed_attempts": [
+        "静态路径提取"
+      ],
+      "ste": {
+        "strategic_principle": "硬编码路径会失效，必须使用 resolver 策略进行动态导出",
+        "tactical_manual": [
+          "先保留未 Patch 的网络请求、调用栈与参数落点证据。",
+          "在页面代码、调用栈或 Hook 日志中匹配 $super、callee、__vmp 等指纹。",
+          "放弃静态路径提取，改用 resolver 策略在运行时动态导出入口。",
+          "回到 analysis_result.json 生成链路，并用 Phase 7/8 校验确认策略仍然有效。"
+        ],
+        "applicable_scenarios": [
+          "obfuscation",
+          "vmp",
+          "dynamic-resolver",
+          "entrypoint-export"
+        ]
+      },
+      "success_count": 1,
+      "updated_at": "2026-05-21"
+    }
+  }
+}
