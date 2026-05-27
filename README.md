@@ -6,7 +6,7 @@
 
 ![Release](https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?color=blue)
 ![Stars](https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill?color=brightgreen)
-![Forks](https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill?color=orange)
+![Forks](https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill)
 ![downloads](https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill/total)
 
 </div>
