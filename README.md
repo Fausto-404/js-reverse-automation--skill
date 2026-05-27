@@ -1,5 +1,18 @@
-# js-reverse-automation--skill
-结合chrome-devtools-mcp的能力并加上Skill的规范，实现JSRPC+Flask+autoDecoder方案的前端JS逆向自动化分析，提升JS逆向的效率
+<h1 align="center">js-reverse-automation--skill 前端JS逆向全流程自动化Skills</h1>
+
+<div align="center">
+
+![Release](https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?color=blue)
+![Stars](https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill?color=brightgreen)
+![Forks](https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill?color=orange)
+![downloads](https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill/total)
+
+</div>
+
+<p align="center">
+  <strong>结合chrome-devtools-mcp的能力并加上Skill的规范，实现JSRPC+Flask+autoDecoder方案的前端JS逆向自动化分析，提升JS逆向的效率</strong>
+</p>
+
 
 ## 适用场景
 
