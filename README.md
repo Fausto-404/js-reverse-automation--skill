@@ -1,5 +1,7 @@
-<h1 align="center">js-reverse-automation--skill 前端JS逆向全流程自动化Skills</h1>
-
+<h1 align="center">js-reverse-automation--skill </h1>
+<p align="center">
+  <code>前端JS逆向全流程自动化Skills</code> 
+</p>
 <div align="center">
 
 ![Release](https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?color=blue)
@@ -19,6 +21,22 @@
 - 需要快速落地前端签名/加密参数逆向
 - 需要将js逆向逻辑封装为可复用的代码
 - 需要与 Burp 配合进行抓包、改包
+
+## 解决传统 AI 逆向的四大痛点
+
+本项目专注于 **实战工程落地** ，通过更轻量的架构打通逆向到实战的最后一公里：
+
+* **从“死磕补环境”到“JSRPC 动态榨取”** ：
+  不强求 AI 去补全复杂的浏览器上下文，而是指导 AI 建立 JSRPC 远程调用。直接将真实浏览器作为算法解析器，绕过混淆逻辑，0 成本获取加密结果。
+
+* **从“孤岛式输出”到“全链路生产交付”** ：
+  拒绝只停留在“看懂代码”阶段。AI 交付的不仅是解析思路，更是直接可运行的 **Python Flask 中转服务** 与 **Burp Suite (autoDecoder) 联动配置**，无缝接入渗透工作流。
+
+* **从“单阶段盲跑”到“契约化阶段校验”** ：
+  引入明确的 Phase 0-9 阶段划分，以 `analysis_result.json` 作为中间产物契约。在生成代码后强制触发本地验证器校验，大幅降低 AI 在复杂长文本下的幻觉与语法错误。
+
+* **从“单次对话记忆”到“经验持续演进”** ：
+  打破“新对话即白纸”的限制。利用 `references/evolution_matrix.json` 记忆库，允许 AI 跨任务沉淀对抗经验，实现技能包针对新型混淆与反调试的持续自我演进。
 
 ## 流程设计思路
 针对js逆向中常用的远程调用法进行js逆向（如JSRPC+Mitmproxy、JSRPC+Flask等）中，初始配置阶段中面对的定位加密函数、编写注册代码、编写python代码等繁琐操作，通过引入AI的MCP和Skill技术进行赋能，让AI自动完成函数发现与注册代码生成，最终实现从“半自动”到“高自动”的跨越，人员全程只需下方指令，并最终配置一下burp即可完成JS逆向的全流程。
