@@ -108,7 +108,7 @@ Target URL: https://xxx.com/login
 Parameters To Analyze: password
 Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method":"POST"})
 ```
-等待运行完成【第一次使用会因缺少中间产物而报错，生成后就可正常使用了】，按输出验证有效性以及配置 Burp 即可。
+等待运行完成【第一次使用会生成产物文件夹】，按输出验证有效性以及配置 Burp 即可。
 
 ## 效果检验
 1. 获取输入所需信息【参考如图1、2、3】
