@@ -57,7 +57,7 @@
 ```latex
 js-reverse-automation/
 ├── SKILL.md                          # 主控文件
-├── references/
+├── references/                       # 参考规范与知识库
 │   ├── output-contract.md            # 输入输出契约
 │   ├── workflow-recon.md             # 阶段流程说明
 │   ├── evidence-collection.md        # 取证方法（Hook/源码/网络）
@@ -65,17 +65,28 @@ js-reverse-automation/
 │   ├── antidebug-patterns.md         # 反调试模式与 Patch
 │   ├── capability-boundaries.md      # 能力边界说明
 │   └── evolution_matrix.json         # 跨任务经验记忆库
-└── scripts/
-    ├── check_inputs.py               # 输入校验
-    ├── emit_runtime_hook_probe.py    # 运行时 Hook 探针生成
-    ├── emit_module_probe.py          # Webpack 模块探针生成
-    ├── detect_encryption.py          # 加密函数候选评分
-    ├── emit_jsrpc_stub.py            # JSRPC 注入代码生成
-    ├── emit_flask_proxy.py           # Flask 代理生成
-    ├── emit_burp_doc.py              # Burp 文档生成
-    ├── manage_services.py            # 服务管理（JSRPC/Flask 启停）
-    ├── validate_artifacts.py         # 全链路校验
-    └── JsEnv_Dev.js                  # Hlclient WebSocket 客户端库
+├── scripts/                          # 自动化工具脚本
+│   ├── check_inputs.py               # 输入校验
+│   ├── emit_runtime_hook_probe.py    # 运行时 Hook 探针生成
+│   ├── emit_module_probe.py          # Webpack 模块探针生成
+│   ├── detect_encryption.py          # 加密函数候选评分
+│   ├── emit_jsrpc_stub.py            # JSRPC 注入代码生成
+│   ├── emit_flask_proxy.py           # Flask 代理生成
+│   ├── emit_burp_doc.py              # Burp 文档生成
+│   ├── manage_services.py            # 服务管理（JSRPC/Flask 启停）
+│   ├── validate_artifacts.py         # 全链路校验
+│   └── JsEnv_Dev.js                  # Hlclient WebSocket 客户端库
+├── generated/                        # AI 运行生成的中间代码/配置产物
+│   ├── jsrpc_inject.js               # JSRPC 浏览器端注入代码
+│   ├── flask_proxy.py                # Flask 本地代理服务
+│   ├── burp-autodecoder.md           # Burp autoDecoder 配置文档
+│   └── runtime_hook_probe.js         # 运行时 Hook 探针脚本
+└── artifacts/                        # 运行时的动态状态与报告产物
+    ├── phase0_input.json             # 校验后的输入
+    ├── encryption_candidates.json    # 加密函数候选评分
+    ├── validation_report.json        # 全链路校验报告
+    ├── jsrpc_status.json             # JSRPC 服务状态
+    └── flask_status.json             # Flask 服务状态
 ```
 
 ## 使用示意
