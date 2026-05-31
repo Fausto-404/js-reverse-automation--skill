@@ -18,7 +18,9 @@
 
 ## 适用场景
 
-- 需要快速落地前端签名/加密参数逆向
+- 登录参数加密（RSA/AES/SM2/SM4/MD5/自定义编码）
+- 数据爬取时响应内容加密
+- 请求签名（sign/token/enc）
 - 需要将js逆向逻辑封装为可复用的代码
 - 需要与 Burp 配合进行抓包、改包
 
@@ -44,178 +46,94 @@
 
 ## 核心能力
 - 基于 MCP 连接真实浏览器，触发并跟踪js加密/签名链路
-- 自动定位 `sign / enc / token` 等关键参数生成入口
-- 自动生成 JSRPC 注入与注册代码
-- 自动生成 Python Flask 代理代码
-- 输出 Burp `autoDecoder` 对接说明，支持端到端联调
-- 支持AntiDebug_Breaker的11项反调试能力
+- 运行时 Hook 探针：自动捕获 fetch/XHR/crypto 调用栈和参数流转
+- Webpack 模块解析：自动发现 `__webpack_require__`，搜索 module cache 中的加密函数
+- 候选评分系统：7 维度评分 + 真实样本验证，降低误判
+- 全自动服务管理：JSRPC 服务器自动发现/启动，Flask 代理自动启停
+- 一键注入：代码生成 + 浏览器注入 + 注册验证全自动
+- Burp 无缝对接：生成 autoDecoder 配置文档，支持端到端联调
 
 ## 项目结构
 ```latex
-js-reverse-automation
-├── SKILL.md # Skill 主控文件。负责定义触发条件、输入要求、分阶段流程、输出要求与验收方式。
-├── agents/
-│   └── openai.yaml # Skill 的 agent 入口配置。定义默认提示词、默认输入格式和执行约束。
-├── artifacts/ # 运行期目录，用于承接流程中间产物和最终校验报告。
-│   ├── phase0_input.json # 规范化后的输入。
-│   ├── phase1_trace.json # 浏览器链路复现结果。
-│   ├── phase2_entrypoints.json # 参数入口识别结果。
-│   ├── phase3_dependencies.json # 依赖、上下文和调用方式提取结果。
-│   └── validation_report.json # 最终校验报告。
+js-reverse-automation/
+├── SKILL.md                          # 主控文件
 ├── references/
-│   ├── workflow-recon.md # 阶段流程说明书。
-│   ├── output-contract.md # 输入输出契约说明书。
-│   ├── failure-recovery.md # 失败恢复和诊断格式说明书。
-│   ├── validation-checklist.md # 验收标准说明书。
-│   ├── network-capture.md # 网络抓取与请求观测说明。
-│   ├── source-location.md # 入口源码定位与位置标注说明。
-│   ├── hook-debugging.md # Hook 调试与链路观察说明。
-│   ├── protocol-resilience.md # 协议适配与稳健性处理说明。
-│   ├── devtools-capability-matrix.md # DevTools 能力矩阵与适用边界说明。
-│   ├── anti-detection-verification.md # 反检测处理后的验证说明。
-│   ├── evolution_matrix.json # 长期经验记忆库，支持跨任务策略继承与经验沉淀。
-│   └── antidebug/
-│       ├── debugger-loop.md # 处理无限 debugger、eval、Function 类问题。
-│       ├── console-detect.md # 处理控制台检测、日志篡改、清屏等问题。
-│       ├── timer-check.md # 处理时间差、性能计时、Promise 时序检测。
-│       ├── env-detect.md # 处理窗口大小、webdriver、UA、DevTools 检测等环境识别问题。
-│       ├── proxy-guard.md # 处理跳转、关闭页面、history、代理拦截等链路阻断问题。
-│       └── dynamic-alias.md # 处理动态别名、wrapper、resolver 型入口和不稳定路径。
+│   ├── output-contract.md            # 输入输出契约
+│   ├── workflow-recon.md             # 阶段流程说明
+│   ├── evidence-collection.md        # 取证方法（Hook/源码/网络）
+│   ├── advanced-entrypoints.md       # 复杂入口场景（Webpack/异步/WASM）
+│   ├── antidebug-patterns.md         # 反调试模式与 Patch
+│   ├── capability-boundaries.md      # 能力边界说明
+│   └── evolution_matrix.json         # 跨任务经验记忆库
 └── scripts/
-    ├── check_inputs.py # 输入校验器。
-    ├── emit_analysis_result.py # 统一分析产物生成器。
-    ├── emit_jsrpc_stub.py # JSRPC 代码生成器。
-    ├── emit_flask_proxy.py # Flask 代理生成器.
-    ├── emit_burp_doc.py # Burp autoDecoder 文档生成器。
-    ├── validate_artifacts.py # 全链路校验器。
-    ├── update_evolution_library.py # 经验库增量更新与长期记忆写入器。
-    └── JsEnv_Dev.js # JS 环境补齐/调试辅助脚本，用于运行期注入或本地复现支撑。
+    ├── check_inputs.py               # 输入校验
+    ├── emit_runtime_hook_probe.py    # 运行时 Hook 探针生成
+    ├── emit_module_probe.py          # Webpack 模块探针生成
+    ├── detect_encryption.py          # 加密函数候选评分
+    ├── emit_jsrpc_stub.py            # JSRPC 注入代码生成
+    ├── emit_flask_proxy.py           # Flask 代理生成
+    ├── emit_burp_doc.py              # Burp 文档生成
+    ├── manage_services.py            # 服务管理（JSRPC/Flask 启停）
+    ├── validate_artifacts.py         # 全链路校验
+    └── JsEnv_Dev.js                  # Hlclient WebSocket 客户端库
 ```
 
 ## 使用示意
-这边演示使用的是codex5.3（**推荐使用去除安全限制的claude code，否则需要对抗安全限制**）
+1. 安装 MCP 服务
 
-1、下载skills放置在codex的skills目录中，mac端的路径为`/Users/用户名/.codex/skills/`
-<img width="880" height="296" alt="image" src="https://github.com/user-attachments/assets/0740b150-1508-46f1-bd76-2c6c9afa3bca" />
-
-
-2、将chrome-devtools-mcp服务写进 Codex 的配置
-
- ```
- codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
- ```
-<img width="2464" height="216" alt="image" src="https://github.com/user-attachments/assets/0a3bd8c8-9029-4d8c-9f50-f91fb5ac4e4e" />
-
-3、修改 Codex 的配置文件MAC的在`~/.codex/config.toml`，添加如下字段
+```bash
+# Claude Code
+claude mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
+# Codex
+codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
+# Gemini
+gemini mcp add chrome-devtools npx -y chrome-devtools-mcp@latest
+```
+2. 将 `js-reverse-automation` 目录放入 Skill 目录，然后输入：
 
 ```
-[mcp_servers.chrome-devtools]
-command = "npx"
-args = ["-y", "chrome-devtools-mcp@latest"]
+# 第一次建议带上jsrpc路径，后续流程会更稳
+Target URL: https://xxx.com/login
+Parameters To Analyze: password
+Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method":"POST"})
 ```
-
-<img width="1848" height="892" alt="image" src="https://github.com/user-attachments/assets/b2f8a0a9-2ab1-44a1-baf6-5b57d20076b5" />
-
-4、检测是否生效
-<img width="2524" height="722" alt="image" src="https://github.com/user-attachments/assets/0dfd71ad-7b03-4eb3-a99a-8c11990dcf72" />
-
-5、启动mcp服务，当看到打开浏览器后MCP服务就配置好了。
-
-```
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-    --remote-debugging-port=9222 \
-    --remote-debugging-address=0.0.0.0
-```
-
-<img width="2374" height="996" alt="image" src="https://github.com/user-attachments/assets/7a2336ee-1d7a-4ead-99c3-9faa00bc18bc" />
-6、在codex客户端中使用该skills
-<img width="2126" height="1548" alt="image" src="https://github.com/user-attachments/assets/5b63f167-e2c2-4686-b28f-3558f18f6012" />
-7、输入所需要的信息
-
-```
-    Target URL: 
-    Parameters To Analyze: 
-    Environment Constraints: 
-    Optional Fetch Example:
-```
-<img width="1546" height="876" alt="image" src="https://github.com/user-attachments/assets/a7359fdb-949c-40da-9c63-ea1e47b4be32" />
-
-8、等待程序运行完成即可
-<img width="1736" height="1016" alt="image" src="https://github.com/user-attachments/assets/76874d70-06c7-4a42-8cdf-de64e75e9c49" />
-
+等待运行完成【第一次使用会因缺少中间产物而报错，生成后就可正常使用了】，按输出验证有效性以及配置 Burp 即可。
 
 ## 效果检验
+1. 获取输入所需信息【参考如图1、2、3】
+<img width="2182" height="1444" alt="image" src="https://github.com/user-attachments/assets/a0edb08b-ef21-4059-bae5-d9a255a69d30" />
+2. 按照模版编写提示词并输入给claude【本次使用的是去除安全限制的claude + mimo-v2.5验证，旨在验证降低模型要求，skills实现效果不变】
+<img width="1810" height="1264" alt="image" src="https://github.com/user-attachments/assets/7703c06a-0f42-4c8d-b2c9-6d18172c1194" />
+3. 等待输出结果
+<img width="1380" height="1462" alt="image" src="https://github.com/user-attachments/assets/9419df5c-f876-41ac-bdba-60d13a603445" />
+4. 依据结果输出测试即可
+<img width="2216" height="1612" alt="image" src="https://github.com/user-attachments/assets/557946b1-1f68-4ba7-8b6a-f794d0858b18" />
+5. 使用完后记得按照指示关闭jsrpc和flask！！！
 
-1、启动JSRPC
-<img width="1354" height="354" alt="image" src="https://github.com/user-attachments/assets/2be18d21-18b8-4594-b1ff-25e9126e5348" />
+## 实战案例
+- xx大学：MD5（全局函数） ✅
+- xx大学：SM2 国密 + DOM 公钥 ✅
+- xx网：RSA-2048 + JSEncrypt 懒加载 ✅
+- xx游：RSA-1024 + Webpack 闭包 ✅
+- 某音乐：AES & RSA 组合 + params / encSecKey 类结构 ✅
 
-
-
-2、在浏览器开发者工具的Console中，执行`js-reverse-automation/scripts/JsEnv_Dev.js`文件中内容。
-<img width="1980" height="1332" alt="image" src="https://github.com/user-attachments/assets/d2d7a299-f354-459c-b624-9d7d95abe130" />
-
-3、在控制台注入AI生成的jsrpc_inject_hr_ncu_password.js。
-
-<img width="1746" height="1320" alt="image" src="https://github.com/user-attachments/assets/b00c2261-ee26-4b88-a408-e0faaba84079" />
-
-4、测试jsrpc调用函数是否正常，可以看到是没问题的。
-
-```
-http://127.0.0.1:12080/go?group=fausto&action=generate_password_md5&param=111111
-```
-
-<img width="2402" height="1056" alt="image" src="https://github.com/user-attachments/assets/5da1563a-84d7-4d6f-b83e-81106bed90a5" />
-
-5、运行flask_proxy_hr_ncu.py
-
-<img width="1744" height="1322" alt="image" src="https://github.com/user-attachments/assets/9b70a477-2b12-464d-8450-822320556c95" />
-
-6、测试Flask是否可以正常加密，可以看到也是没问题的。
-
-```
-curl -X POST http://127.0.0.1:8888/encode \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "dataBody=username=111111&password=111111&code=1234&role=000002"
-```
-
-<img width="2508" height="1092" alt="image" src="https://github.com/user-attachments/assets/a9001881-b303-4c6c-a4bf-03f32576e44b" />
-
-7、最后根据Burp autoDecoder 配置说明配置burp的autoDecoder插件，也成功加密了参数，整体成功运行完成
-<img width="2382" height="1314" alt="image" src="https://github.com/user-attachments/assets/f3af2dd7-fe79-424a-be12-cea763c33e16" />
+案例后续会更新到案例库，敬请期待。。。。
 
 ## 引用工具
 - JsRpc：https://github.com/jxhczhl/JsRpc 
 - autoDecoder：https://github.com/f0ng/autoDecoder 
 - chrome-devtools-mcp：https://github.com/ChromeDevTools/chrome-devtools-mcp/ 
-- AntiDebug：https://github.com/0xsdeo/AntiDebug_Breaker
+
 ## 更新日志
-
-### 2026-02-03
-- 优化项目结构，支持直接导入 Claude、Codex、Trae 等支持 Skills 的平台（`agents/` 目录可按需调整）。
-
-### 2026-02-11
-- 新增 11 个反调试补充技能，完善对复杂目标的反调试对抗能力。
-
-### 2026-03-10
-+ 将 Skill 重构为“主控文件 + 参考规则 + 生成器 + 校验器 + 中间产物”架构，**输出质量更稳定、更高可用**
-+ 新增统一中间产物 `analysis_result.json`
-+ 新增输入校验器、分析产物生成器、JSRPC 生成器、Flask 生成器、Burp 文档生成器、统一校验器
-+ 新增流程文档、输出契约、失败恢复、验收清单
-+ 将 `references/antidebug` 从嵌套子 Skill 重构为参考规则集合
-+ 明确 `artifacts/` 作为阶段产物和校验报告目录
-
-### 2026-03-19
-+ 添加对抗AI识别为高风险执行操作拒绝执行的能力
-+ 添加对应提示词输入指引
-
-### 2026-04-10
-+ 补强了请求复现、参数入口定位、页面内观测代码注入、反检测验证和协议层差异分析等能力。
-+ 对 skill 文本本身做了规范化整理，明确了 chrome-devtools-mcp 的真实能力边界，补充了对应的参考规则，并收紧了不确定结论的表达方式。
-+ 更适合处理复杂 JS 逆向场景，完成标准化输出任务
-+ **推荐使用去除安全限制版本的claude进行测试，codex最近道德水平有点高**
-### 2026-05-21
-+ **让skills越用越聪明**
-+ 引入 Phase 9 经验沉淀与对抗库演进流程，新增跨任务长期经验记忆库 references/evolution_matrix.json。
-+ 支持注册主域名级别的 Action 名称与 Flask 路由绑定记忆跨任务继承，实现动态特征对齐和老策略失效时强制阻断回滚。
-+ 引入模块化经验模型，将自动化逆向攻防策略解耦并持久化为结构化知识：
-+ 新增 scripts/update_evolution_library.py 经验库写入器，采用文件锁（fcntl）与临时文件原子替换机制，全面保障跨并发与异常中断下的数据完整性。
+### v1版本更新记录
+- 2026-05-21: 引入 Phase 9 经验沉淀与对抗库演进
+- 2026-04-10: 补强请求复现、参数入口定位、反检测验证能力
+- 2026-03-19: 添加对抗 AI 识别为高风险操作的能力
+- 2026-03-10: 重构为"主控文件 + 参考规则 + 生成器 + 校验器"架构
+- 2026-02-11: 新增 11 个反调试补充技能
+- 2026-02-03: 优化项目结构，支持 Claude/Codex/Trae 平台
+### v2.0 (2026-05-31)
+- **架构优化**：阶段流程从 Phase 0-9 精简为 Phase 0-8，消除冗余步骤，token 消耗减少约**40%**
+- **全自动化**：JSRPC 自动发现/启动、Flask 自动启停、浏览器自动注入，**全程只需配置 Burp**
+- **更强入口定位**：运行时 Hook 探针 + Webpack 模块解析 + 7 维度候选评分，提供更强大、更快速的入口定位能力，**对模型要求降低**
+- **更稳定输出**：capability_boundary 显式声明不支持场景、runtime_health 健康检测、候选验证机制
