@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Generate a Flask proxy from analysis_result.json."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--analysis", required=True, help="Path to analysis_result.json.")
+    parser.add_argument("--output", required=True, help="Generated Flask file path.")
+    return parser.parse_args()
+
+
+def load_json(path: str) -> dict:
+    with Path(path).open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise ValueError("analysis_result.json must contain a JSON object")
+    return data
+
+
+def build_script(analysis: dict) -> str:
+    parameters = list(analysis.get("parameters", {}).keys())
+    jsrpc = analysis["jsrpc"]
+    flask = analysis["flask"]
+    flask_server = analysis.get("flask_server", {})
+    route = flask["route"]
+    listen_host = flask_server.get("host", flask.get("listen_host", "127.0.0.1"))
+    listen_port = flask_server.get("port", flask.get("listen_port", 5000))
+
+    return f"""# emit_flask_proxy.py
+from __future__ import annotations
+
+import json
+import time
+from urllib.parse import parse_qsl, urlencode
+
+import requests
+from flask import Flask, jsonify, request
+
+
+app = Flask(__name__)
+JSRPC_GO_URL = {json.dumps(jsrpc["transport"]["go_url"])}
+JSRPC_GROUP = {json.dumps(jsrpc["group"])}
+JSRPC_ACTION = {json.dumps(jsrpc["action_name"])}
+TARGET_PARAMETERS = {json.dumps(parameters)}
+ROUTE = {json.dumps(route)}
+TIMEOUT_SECONDS = 10
+
+
+def split_burp_payload(raw_headers: str, raw_body: str) -> tuple[str, str]:
+    if raw_headers:
+        return raw_headers, raw_body
+    return "", raw_body
+
+
+def decode_body(raw_body: str) -> tuple[str, object]:
+    try:
+        return "json", json.loads(raw_body)
+    except json.JSONDecodeError:
+        return "form", dict(parse_qsl(raw_body, keep_blank_values=True))
+
+
+def encode_body(body_type: str, body: object) -> str:
+    if body_type == "json":
+        return json.dumps(body, ensure_ascii=False, separators=(",", ":"))
+    return urlencode(body, doseq=True)
+
+
+class JSRPCError(Exception):
+    def __init__(self, message: str, status: str = "error", detail: str = ""):
+        super().__init__(message)
+        self.status = status
+        self.detail = detail
+
+
+def invoke_jsrpc(parameter: str, value: object, retries: int = 2) -> object:
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            response = requests.get(
+                JSRPC_GO_URL,
+                params={{
+                    "group": JSRPC_GROUP,
+                    "action": JSRPC_ACTION,
+                    "param": json.dumps({{"parameter": parameter, "value": value}}, ensure_ascii=False),
+                }},
+                timeout=TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not payload.get("status", True) and "data" not in payload:
+                raise JSRPCError(
+                    f"unexpected JSRPC response: {{payload}}",
+                    status="unexpected_response",
+                    detail=json.dumps(payload),
+                )
+            data = payload.get("data", payload)
+            if isinstance(data, str) and data.startswith("__JSRPC_ERROR__:"):
+                raise JSRPCError(data, status="entrypoint_error", detail=data)
+            if isinstance(data, dict) and not data.get("ok", True):
+                raise JSRPCError(
+                    data.get("error", {{}}).get("message", "unknown JSRPC error"),
+                    status="entrypoint_error",
+                    detail=json.dumps(data),
+                )
+            if isinstance(data, dict) and "result" in data:
+                return data["result"]
+            return data
+        except requests.ConnectionError as e:
+            last_error = JSRPCError(
+                f"JSRPC server unavailable: {{e}}",
+                status="connection_error",
+                detail=str(e),
+            )
+        except requests.Timeout as e:
+            last_error = JSRPCError(
+                f"JSRPC timeout after {{TIMEOUT_SECONDS}}s: {{e}}",
+                status="timeout",
+                detail=str(e),
+            )
+        except JSRPCError:
+            raise
+        except Exception as e:
+            last_error = JSRPCError(str(e), status="unknown", detail=str(e))
+        if attempt < retries:
+            time.sleep(0.5)
+    raise last_error
+
+
+def update_content_length(raw_headers: str, encoded_body: str) -> str:
+    if not raw_headers:
+        return raw_headers
+    lines = raw_headers.split("\\r\\n")
+    updated = []
+    replaced = False
+    for line in lines:
+        if line.lower().startswith("content-length:"):
+            updated.append(f"Content-Length: {{len(encoded_body.encode('utf-8'))}}")
+            replaced = True
+        else:
+            updated.append(line)
+    if not replaced:
+        updated.append(f"Content-Length: {{len(encoded_body.encode('utf-8'))}}")
+    return "\\r\\n".join(updated)
+
+
+@app.get("/healthz")
+def healthz():
+    return jsonify({{"status": "ok", "route": ROUTE, "action": JSRPC_ACTION}})
+
+
+@app.post(ROUTE)
+def encode():
+    raw_body = request.form.get("dataBody", "")
+    raw_headers = request.form.get("dataHeaders", "")
+    _, body = split_burp_payload(raw_headers, raw_body)
+    body_type, parsed = decode_body(body)
+
+    if not isinstance(parsed, dict):
+        return raw_body, 400
+
+    for parameter in TARGET_PARAMETERS:
+        if parameter not in parsed:
+            continue
+        try:
+            parsed[parameter] = invoke_jsrpc(parameter, parsed[parameter])
+        except JSRPCError as e:
+            return jsonify({{"error": e.message, "status": e.status, "detail": e.detail, "parameter": parameter}}), 502
+
+    encoded_body = encode_body(body_type, parsed)
+    encoded_headers = update_content_length(raw_headers, encoded_body)
+    if encoded_headers:
+        return encoded_headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + encoded_body
+    return encoded_body
+
+
+if __name__ == "__main__":
+    app.run(host={json.dumps(listen_host)}, port={int(listen_port)}, debug=False)
+"""
+
+
+def main() -> int:
+    args = parse_args()
+    analysis = load_json(args.analysis)
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(build_script(analysis), encoding="utf-8")
+    print(json.dumps({"status": "ok", "output": str(output_path)}, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
