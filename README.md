@@ -4,10 +4,23 @@
 </p>
 <div align="center">
 
-![Release](https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?color=blue)
-![Stars](https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill?color=brightgreen)
-![Forks](https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill)
-![downloads](https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill/total)
+<p align="center">
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/releases">
+    <img src="https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?style=flat-square&label=release&color=blue&cacheSeconds=3600" alt="Release">
+  </a>
+
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/stargazers">
+    <img src="https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill?style=flat-square&label=stars&color=brightgreen&cacheSeconds=3600" alt="GitHub Stars">
+  </a>
+
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/network/members">
+    <img src="https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill?style=flat-square&label=forks&color=orange&cacheSeconds=3600" alt="GitHub Forks">
+  </a>
+
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/releases">
+    <img src="https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill/total?style=flat-square&label=downloads&color=success&cacheSeconds=3600" alt="Downloads">
+  </a>
+</p>
 
 </div>
 
@@ -108,7 +121,7 @@ Target URL: https://xxx.com/login
 Parameters To Analyze: password
 Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method":"POST"})
 ```
-等待运行完成【第一次使用会生成产物文件夹】，按输出验证有效性以及配置 Burp 即可。
+等待运行完成【第一次使用会生成产物文件夹】，按输出结果，验证有效性以及配置 Burp 即可。
 
 ## 效果检验
 1. 获取输入所需信息【参考如图1、2、3】
@@ -128,7 +141,7 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - xx游：RSA-1024 + Webpack 闭包 ✅
 - 某音乐：AES & RSA 组合 + params / encSecKey 类结构 ✅
 
-案例后续会更新到案例库，敬请期待。。。。
+案例后续会更新到案例库，敬请期待....
 
 ## 引用工具
 - JsRpc：https://github.com/jxhczhl/JsRpc 
