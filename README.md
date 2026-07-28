@@ -188,7 +188,6 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - **更强入口定位**：运行时 Hook 探针 + Webpack 模块解析 + 7 维度候选评分，提供更强大、更快速的入口定位能力，**对模型要求降低**
 - **更稳定输出**：capability_boundary 显式声明不支持场景、runtime_health 健康检测、候选验证机制
 ### v2.1 (2026-07-28)
-- **Fetch Example 分析**：提供 Fetch Example 后自动提取加密算法、参数格式，跳过网络捕获，效率提升
 - **证据驱动**：SHA-256 指纹关联、证据图构建、差分验证，从"可能对"变成"确认对"
 - **扩展 Hook**：WebSocket/Request/TextEncoder/btoa/CryptoJS/JSEncrypt/sm2/sm3/sm4，覆盖更多加密场景
 - **降级策略链**：5 级降级，不轻易放弃，模块内部加密也能处理
