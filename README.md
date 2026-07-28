@@ -1,6 +1,6 @@
-<h1 align="center">js-reverse-automation--skill </h1>
+<h1 align="center">js-reverse-automation--skill</h1>
 <p align="center">
-  <code>前端JS逆向全流程自动化Skills</code> 
+  <code>前端JS逆向全流程自动化Skill</code>
 </p>
 <div align="center">
 
@@ -59,9 +59,11 @@
 
 ## 核心能力
 - 基于 MCP 连接真实浏览器，触发并跟踪js加密/签名链路
-- 运行时 Hook 探针：自动捕获 fetch/XHR/crypto 调用栈和参数流转
+- 运行时 Hook 探针：自动捕获 fetch/XHR/crypto/WebSocket/CryptoJS/JSEncrypt/sm2/sm3/sm4 调用栈和参数流转
 - Webpack 模块解析：自动发现 `__webpack_require__`，搜索 module cache 中的加密函数
-- 候选评分系统：7 维度评分 + 真实样本验证，降低误判
+- 候选评分系统：8 维度评分 + 真实样本验证，降低误判
+- 差分验证：主动调用候选函数，比对请求字段指纹，确保准确性
+- 证据图构建：SHA-256 指纹关联 producer→consumer，追踪数据流
 - 全自动服务管理：JSRPC 服务器自动发现/启动，Flask 代理自动启停
 - 一键注入：代码生成 + 浏览器注入 + 注册验证全自动
 - Burp 无缝对接：生成 autoDecoder 配置文档，支持端到端联调
@@ -69,25 +71,44 @@
 ## 项目结构
 ```latex
 js-reverse-automation/
-├── SKILL.md                          # 主控文件
-├── references/                       # 参考规范与知识库
+├── SKILL.md                          # 入口文件（精简版）
+├── workflow/
+│   └── pipeline.md                   # 详细工作流（Phase 0-9）
+├── constraints/
+│   └── rules.md                      # 约束规则
+├── references/                       # 参考规范与知识库（按需加载）
 │   ├── output-contract.md            # 输入输出契约
-│   ├── workflow-recon.md             # 阶段流程说明
-│   ├── evidence-collection.md        # 取证方法（Hook/源码/网络）
-│   ├── advanced-entrypoints.md       # 复杂入口场景（Webpack/异步/WASM）
-│   ├── antidebug-patterns.md         # 反调试模式与 Patch
 │   ├── capability-boundaries.md      # 能力边界说明
+│   ├── architecture.md               # 架构说明
+│   ├── security-model.md             # 安全模型
+│   ├── antidebug-patterns.md         # 反调试模式与 Patch
+│   ├── advanced-entrypoints.md       # 复杂入口场景（Webpack/异步/WASM）
+│   ├── evidence-collection.md        # 取证方法（Hook/源码/网络）
 │   └── evolution_matrix.json         # 跨任务经验记忆库
+├── schemas/                          # JSON Schema 定义
+│   ├── analysis_result.schema.json
+│   ├── candidates.schema.json
+│   └── probe_dump.schema.json
 ├── scripts/                          # 自动化工具脚本
+│   ├── common.py                     # 共享工具库
 │   ├── check_inputs.py               # 输入校验
 │   ├── emit_runtime_hook_probe.py    # 运行时 Hook 探针生成
 │   ├── emit_module_probe.py          # Webpack 模块探针生成
+│   ├── build_evidence_graph.py       # 证据图构建
 │   ├── detect_encryption.py          # 加密函数候选评分
+│   ├── differential_verifier.py      # 差分验证
 │   ├── emit_jsrpc_stub.py            # JSRPC 注入代码生成
 │   ├── emit_flask_proxy.py           # Flask 代理生成
 │   ├── emit_burp_doc.py              # Burp 文档生成
 │   ├── manage_services.py            # 服务管理（JSRPC/Flask 启停）
-│   ├── validate_artifacts.py         # 全链路校验
+│   ├── validate_artifacts.py         # 四层校验
+│   ├── quarantine.py                 # 隔离报告
+│   ├── doctor.py                     # 依赖检查
+│   ├── env_patcher.py                # 环境补丁
+│   ├── classify_anticrawl.py         # 反爬分类
+│   ├── identify_crypto.py            # 加密算法识别
+│   ├── hook_templates.py             # Hook 模板库
+│   ├── ast_candidate_analyzer.js     # AST 静态分析
 │   └── JsEnv_Dev.js                  # Hlclient WebSocket 客户端库
 ├── generated/                        # AI 运行生成的中间代码/配置产物
 │   ├── jsrpc_inject.js               # JSRPC 浏览器端注入代码
@@ -96,8 +117,12 @@ js-reverse-automation/
 │   └── runtime_hook_probe.js         # 运行时 Hook 探针脚本
 └── artifacts/                        # 运行时的动态状态与报告产物
     ├── phase0_input.json             # 校验后的输入
+    ├── probe_dump.json               # 运行时事件数据
+    ├── module_dump.json              # Webpack 模块发现结果
+    ├── evidence_graph.json           # 事件关联图
     ├── encryption_candidates.json    # 加密函数候选评分
-    ├── validation_report.json        # 全链路校验报告
+    ├── validation_report.json        # 四层校验报告
+    ├── quarantine.json               # 隔离报告
     ├── jsrpc_status.json             # JSRPC 服务状态
     └── flask_status.json             # Flask 服务状态
 ```
@@ -140,8 +165,9 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - xx网：RSA-2048 + JSEncrypt 懒加载 ✅
 - xx游：RSA-1024 + Webpack 闭包 ✅
 - 某音乐：AES & RSA 组合 + params / encSecKey 类结构 ✅
-
-案例后续会更新到案例库，敬请期待....
+- 某理工学院：RSA-1024 + React 组件 encodePass ✅
+- xx鱼：RSA-1024 + 全局 miniLogin.rsaPassword ✅
+- xx神：RSA-1024 + 模块内部加密（源码分析） ✅
 
 ## 引用工具
 - JsRpc：https://github.com/jxhczhl/JsRpc 
@@ -161,3 +187,11 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - **全自动化**：JSRPC 自动发现/启动、Flask 自动启停、浏览器自动注入，**全程只需配置 Burp**
 - **更强入口定位**：运行时 Hook 探针 + Webpack 模块解析 + 7 维度候选评分，提供更强大、更快速的入口定位能力，**对模型要求降低**
 - **更稳定输出**：capability_boundary 显式声明不支持场景、runtime_health 健康检测、候选验证机制
+### v2.1 (2026-07-28)
+- **Fetch Example 分析**：提供 Fetch Example 后自动提取加密算法、参数格式，跳过网络捕获，效率提升
+- **证据驱动**：SHA-256 指纹关联、证据图构建、差分验证，从"可能对"变成"确认对"
+- **扩展 Hook**：WebSocket/Request/TextEncoder/btoa/CryptoJS/JSEncrypt/sm2/sm3/sm4，覆盖更多加密场景
+- **降级策略链**：5 级降级，不轻易放弃，模块内部加密也能处理
+- **四层验证**：Schema + 静态 + 候选不变量 + 跨文件一致性
+- **Token 优化**：SKILL.md 精简 84%，参考资料按需加载，初始加载总 token 约减少 95%
+- **新增工具**：反爬分类、加密算法识别、Hook 模板库、环境补丁、AST 分析、隔离报告
