@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jsra.local/schemas/analysis_result.schema.json",
+  "title": "JSRA Analysis Result v2.1",
+  "type": "object",
+  "required": [
+    "version",
+    "authorization",
+    "target"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^2\\.1(?:\\.\\d+)?$"
+    },
+    "authorization": {
+      "type": "object",
+      "required": [
+        "confirmed"
+      ],
+      "properties": {
+        "confirmed": {
+          "const": true
+        },
+        "scope_note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "url_pattern"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "type": "string"
+        },
+        "request_content_type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "jsrpc": {
+      "type": "object"
+    },
+    "verification": {
+      "type": "object"
+    },
+    "evidence_gate": {
+      "type": "object",
+      "properties": {
+        "requires_runtime_proof": { "type": "boolean" },
+        "requires_e2e": { "type": "boolean" },
+        "blocked_until": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "probe_dump": { "type": "string" },
+        "module_dump": { "type": "string" },
+        "evidence_graph": { "type": "string" },
+        "differential_verification": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "transforms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "location",
+          "action"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "direction": {
+            "enum": [
+              "request",
+              "response"
+            ]
+          },
+          "location": {
+            "enum": [
+              "body",
+              "query",
+              "header",
+              "cookie",
+              "response"
+            ]
+          },
+          "content_type": {
+            "enum": [
+              "json",
+              "form",
+              "multipart",
+              "raw",
+              "auto"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_path": {
+            "type": "string"
+          },
+          "safe_to_invoke": {
+            "type": "boolean"
+          },
+          "arguments": {
+            "type": "array"
+          },
+          "preserve_order": {
+            "type": "boolean"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "parameters": {
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "required": [
+        "transforms"
+      ]
+    },
+    {
+      "required": [
+        "parameters"
+      ]
+    }
+  ],
+  "additionalProperties": true
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "type",
+          "timestamp"
+        ]
+      }
+    },
+    "requests": {
+      "type": "array"
+    },
+    "crypto": {
+      "type": "array"
+    },
+    "serializers": {
+      "type": "array"
+    },
+    "calls": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}
