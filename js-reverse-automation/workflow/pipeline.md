@@ -104,7 +104,7 @@ python3 scripts/manage_services.py --service flask --analysis analysis_result.js
 - 用 `evaluate_script` 依次注入 `JsEnv_Dev.js` 和 `generated/jsrpc_inject.js`；若使用运行时探针，先注入探针再注入 JSRPC。
 - 验证：`curl http://127.0.0.1:12080/list`
 - 调用 JSRPC 后必须检查 `plaintext`、最终 `request.url`、`requestBody`、`status` 和最终 `response`；仅出现函数名或候选分数不得判定通过。
-- 若成功响应会触发页面跳转，在分析配置中使用 `capture.suppress_page_success=true`，只抑制测试页面的后续跳转，仍记录真实响应。
+- 标准捕获层同时覆盖 `fetch` 与 `XMLHttpRequest`；若成功响应会触发页面跳转，在分析配置中使用 `capture.suppress_page_success=true`，只抑制 `fetch` 测试页面的后续跳转，仍记录真实响应。XHR 成功响应只采集不改写。
 
 ### 可复制验证命令
 

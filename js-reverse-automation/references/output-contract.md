@@ -15,7 +15,7 @@ v2.2 不得把 v2.1 的最终报告替换成“只返回候选 JSON”或“只�
 
 v2.2 的 `对抗分析`、`runtime_health`、`adversarial_diff` 和能力边界只能作为追加章节，不能删除或改写上述交付项。
 
-JSRPC 验证输出必须能证明完整链路：`plaintext`、最终目标 `route`、非空 `requestBody`（密文/签名）、HTTP 状态和最终业务 `response`。对存在前置取钥匙/取签名请求的函数，必须按规范化 URL 路径选择最终请求。
+JSRPC 验证输出必须能证明完整链路：`plaintext`、最终目标 `route`、非空 `requestBody`（密文/签名）、HTTP 状态和最终业务 `response`。捕获层同时覆盖 `fetch` 与 `XMLHttpRequest`；对存在前置取钥匙/取签名请求的函数，必须按规范化 URL 路径选择最终请求。
 
 ## 运行时产物
 | 产物 | 生成脚本 | 说明 |

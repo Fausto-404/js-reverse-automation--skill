@@ -6,19 +6,19 @@
 
 <p align="center">
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/releases">
-    <img src="https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?style=flat-square&label=release&color=blue&cacheSeconds=3600" alt="Release">
+    <img src="https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill-test?style=flat-square&label=release&color=blue&cacheSeconds=3600" alt="Release">
   </a>
 
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/stargazers">
-    <img src="https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill?style=flat-square&label=stars&color=brightgreen&cacheSeconds=3600" alt="GitHub Stars">
+    <img src="https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill-test?style=flat-square&label=stars&color=brightgreen&cacheSeconds=3600" alt="GitHub Stars">
   </a>
 
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/network/members">
-    <img src="https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill?style=flat-square&label=forks&color=orange&cacheSeconds=3600" alt="GitHub Forks">
+    <img src="https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill-test?style=flat-square&label=forks&color=orange&cacheSeconds=3600" alt="GitHub Forks">
   </a>
 
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/releases">
-    <img src="https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill/total?style=flat-square&label=downloads&color=success&cacheSeconds=3600" alt="Downloads">
+    <img src="https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill-test/total?style=flat-square&label=downloads&color=success&cacheSeconds=3600" alt="Downloads">
   </a>
 </p>
 
@@ -202,6 +202,7 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - **状态差分**：新增基线与干预差分报告，区分证据增加、错误增加和真正业务成功
 - **组合稳定性**：对抗探针与加密运行时探针共享 Hook 编排器，支持叠加、外部替换重建和安全卸载
 - **证据可靠性**：原始捕获改为有界循环引用安全快照，避免 CryptoJS/JSEncrypt 对象导致导出失败
+- **传输覆盖**：JSRPC 最终请求捕获统一覆盖 fetch 与 XMLHttpRequest，并清理成功调用后的超时计时器
 ### v2.0 (2026-05-31)
 - **架构优化**：阶段流程从 Phase 0-9 精简为 Phase 0-8，消除冗余步骤，token 消耗减少约**40%**
 - **全自动化**：JSRPC 自动发现/启动、Flask 自动启停、浏览器自动注入，**全程只需配置 Burp**

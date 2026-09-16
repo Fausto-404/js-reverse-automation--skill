@@ -243,12 +243,43 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
 
   async function invokeWithNetworkCapture(fn, thisArg, args, captureConfig = {{}}) {{
     const originalFetch = window.fetch;
+    const xhrPrototype = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
+    const originalXhrOpen = xhrPrototype && xhrPrototype.open;
+    const originalXhrSend = xhrPrototype && xhrPrototype.send;
+    const originalXhrSetRequestHeader = xhrPrototype && xhrPrototype.setRequestHeader;
     const timeoutMs = 10000;
     let captured = null;
     const requests = [];
     let resolveNetwork;
     const networkSeen = new Promise(resolve => {{ resolveNetwork = resolve; }});
     let restored = false;
+    const recordNetwork = record => {{
+      requests.push(record);
+      const expected = String(captureConfig.url_contains || captureConfig.route || "");
+      if (matchesRoute(record.url, expected)) {{
+        captured = record;
+        resolveNetwork(captured);
+        return true;
+      }}
+      return false;
+    }};
+    const parseXhrResponse = xhr => {{
+      try {{
+        const value = xhr.responseType === "" || xhr.responseType === "text"
+          ? xhr.responseText : xhr.response;
+        if (typeof value === "string") {{
+          try {{ return JSON.parse(value); }} catch (_) {{ return value; }}
+        }}
+        return serializeRequestBody(value);
+      }} catch (_) {{ return null; }}
+    }};
+    const withTimeout = (promise, ms, fallback) => {{
+      let timer;
+      const timeout = new Promise(resolve => {{
+        timer = setTimeout(() => resolve(fallback), ms);
+      }});
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    }};
     const restore = () => {{
       if (restored) return;
       restored = true;
@@ -257,6 +288,13 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
           configurable: true, writable: true, value: originalFetch
         }});
       }} catch (_) {{ try {{ window.fetch = originalFetch; }} catch (__) {{}} }}
+      if (xhrPrototype) {{
+        for (const [key, value] of [["open", originalXhrOpen], ["send", originalXhrSend], ["setRequestHeader", originalXhrSetRequestHeader]]) {{
+          if (typeof value !== "function") continue;
+          try {{ Object.defineProperty(xhrPrototype, key, {{ configurable: true, writable: true, value }}); }}
+          catch (_) {{ try {{ xhrPrototype[key] = value; }} catch (__) {{}} }}
+        }}
+      }}
     }};
 
     if (typeof originalFetch === "function") {{
@@ -278,11 +316,7 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
           status: response.status,
           response: responseBody
         }};
-        requests.push(record);
-        const expected = String(captureConfig.url_contains || captureConfig.route || "");
-        if (matchesRoute(url, expected)) {{
-          captured = record;
-          resolveNetwork(captured);
+        if (recordNetwork(record)) {{
           if (captureConfig.suppress_page_success === true) {{
             try {{
               return new Response(JSON.stringify({{ success: false }}), {{
@@ -303,20 +337,63 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
       }}
     }}
 
+    if (xhrPrototype && typeof originalXhrOpen === "function" && typeof originalXhrSend === "function") {{
+      try {{
+        Object.defineProperty(xhrPrototype, "open", {{
+          configurable: true, writable: true,
+          value: function(method, url) {{
+            this.__jsraCapture = {{ method: String(method || "GET"), url: String(url || ""), headers: {{}} }};
+            return Reflect.apply(originalXhrOpen, this, arguments);
+          }}
+        }});
+        if (typeof originalXhrSetRequestHeader === "function") {{
+          Object.defineProperty(xhrPrototype, "setRequestHeader", {{
+            configurable: true, writable: true,
+            value: function(name, value) {{
+              const capture = this.__jsraCapture || (this.__jsraCapture = {{ method: "GET", url: "", headers: {{}} }});
+              capture.headers[String(name)] = String(value);
+              return Reflect.apply(originalXhrSetRequestHeader, this, arguments);
+            }}
+          }});
+        }}
+        Object.defineProperty(xhrPrototype, "send", {{
+          configurable: true, writable: true,
+          value: function(body) {{
+            const xhr = this;
+            const capture = xhr.__jsraCapture || {{ method: "GET", url: "", headers: {{}} }};
+            const onLoadEnd = () => {{
+              const record = {{
+                transport: "xhr",
+                url: capture.url,
+                method: capture.method,
+                headers: capture.headers,
+                requestBody: serializeRequestBody(body),
+                status: xhr.status,
+                response: parseXhrResponse(xhr)
+              }};
+              recordNetwork(record);
+              try {{ xhr.removeEventListener("loadend", onLoadEnd); }} catch (_) {{}}
+            }};
+            try {{ xhr.addEventListener("loadend", onLoadEnd, {{ once: true }}); }} catch (_) {{}}
+            return Reflect.apply(originalXhrSend, this, arguments);
+          }}
+        }});
+      }} catch (_) {{
+        // Some pages make XHR methods non-configurable; fetch capture remains available.
+      }}
+    }}
+
     let resultState;
     try {{
       const result = fn.apply(thisArg, args);
-      resultState = await Promise.race([
+      resultState = await withTimeout(
         Promise.resolve(result).then(value => ({{ value }}), error => ({{ error }})),
-        new Promise(resolve => setTimeout(() => resolve({{ timedOut: true }}), timeoutMs))
-      ]);
+        timeoutMs, {{ timedOut: true }}
+      );
     }} catch (error) {{
       resultState = {{ error }};
     }}
-    const network = await Promise.race([
-      networkSeen,
-      new Promise(resolve => setTimeout(() => resolve(null), timeoutMs))
-    ]);
+    const network = await withTimeout(networkSeen, timeoutMs, null);
     restore();
     return {{ resultState, network: network || captured, requests }};
   }}

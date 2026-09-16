@@ -16,7 +16,9 @@
   "delivery_regressions": [
     {"issue":"page functions return void after fetch","fix":"generated JSRPC captures fetch request/response during invocation"},
     {"issue":"multiple fetches before final business request","fix":"normalized exact pathname route matching"},
-    {"issue":"success navigation interrupts repeated tests","fix":"optional capture.suppress_page_success test mode"}
+    {"issue":"success navigation interrupts repeated tests","fix":"optional capture.suppress_page_success test mode"},
+    {"issue":"XHR-only pages had no final request body in JSRPC output","fix":"unified fetch/XHR capture with route matching, response parsing, and request headers"},
+    {"issue":"successful invocation left timeout timers alive","fix":"clear result/network timeout timers after Promise.race settles"}
   ],
   "limits": [
     "suppress_page_success is test-only and does not change captured server response",

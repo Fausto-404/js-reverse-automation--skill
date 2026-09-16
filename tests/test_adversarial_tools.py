@@ -155,10 +155,88 @@ class AdversarialToolTests(unittest.TestCase):
             content = output.read_text(encoding="utf-8")
             self.assertIn("invokeWithNetworkCapture", content)
             self.assertIn("matchesRoute", content)
+            self.assertIn("originalXhrOpen", content)
+            self.assertIn('transport: "xhr"', content)
+            self.assertIn("parseXhrResponse", content)
             self.assertIn("bindInputFields", content)
             self.assertIn("requestBody", content)
             self.assertIn("suppress_page_success", content)
             self.assertEqual(subprocess.run(["node", "--check", str(output)]).returncode, 0)
+
+    def test_jsrpc_captures_xhr_end_to_end(self):
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            analysis = folder / "analysis.json"
+            candidates = folder / "candidates.json"
+            output = folder / "jsrpc.js"
+            analysis.write_text(json.dumps({
+                "parameters": {
+                    "password": {
+                        "entrypoint": {"type": "global", "path": "sendDataXhr"},
+                        "runtime": {"bind_this_mode": "none"},
+                        "capture": {"route": "/api/final"},
+                        "jsra_transform": {"candidate_path": "sendDataXhr", "safe_to_invoke": True},
+                    }
+                },
+                "jsrpc": {"action_name": "jsra_xhr", "group": "jsra"},
+            }), encoding="utf-8")
+            candidates.write_text(json.dumps({"candidates": [{
+                "path": "sendDataXhr", "source": "runtime", "type": "function",
+                "verified": True, "verification": [{"matched": True}],
+            }]}), encoding="utf-8")
+            generated = subprocess.run(
+                [sys.executable, str(JSRA / "scripts" / "emit_jsrpc_stub.py"),
+                 "--analysis", str(analysis), "--candidates", str(candidates),
+                 "--output", str(output)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            harness = r'''
+global.window = globalThis;
+global.window.location = { href: "http://test.local/" };
+global.document = { getElementById() { return null; } };
+class FakeXHR {
+  constructor() { this.listeners = {}; this.responseType = ""; this.headers = {}; }
+  addEventListener(name, fn) { (this.listeners[name] ||= []).push(fn); }
+  removeEventListener(name, fn) { this.listeners[name] = (this.listeners[name] || []).filter(item => item !== fn); }
+  open(method, url) { this.method = method; this.url = url; }
+  setRequestHeader(name, value) { this.headers[name] = value; }
+  send(body) {
+    this.body = body;
+    setTimeout(() => {
+      this.status = 200;
+      this.responseText = JSON.stringify({ success: true });
+      for (const fn of this.listeners.loadend || []) fn();
+    }, 0);
+  }
+}
+global.XMLHttpRequest = FakeXHR;
+global.sendDataXhr = function(value) {
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/final");
+  xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+  xhr.send("cipher=" + value);
+};
+global.Hlclient = class {
+  constructor() {}
+  regAction(name, callback) { global.__action = callback; }
+};
+require(process.env.JSRA_SCRIPT);
+global.__action(value => console.log(JSON.stringify(value)), { parameter: "password", value: "hello" });
+'''
+            result = subprocess.run(
+                ["node", "-e", harness],
+                env={**dict(__import__("os").environ), "JSRA_SCRIPT": str(output)},
+                capture_output=True, text=True, timeout=5,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout.strip().splitlines()[-1])
+            self.assertTrue(payload["success"])
+            self.assertEqual(payload["request"]["transport"], "xhr")
+            self.assertEqual(payload["requestBody"], "cipher=hello")
+            self.assertEqual(payload["request"]["url"], "/api/final")
+            self.assertEqual(payload["status"], 200)
+            self.assertEqual(payload["response"], {"success": True})
 
     def test_validator_rejects_quarantined_jsrpc_output(self):
         with tempfile.TemporaryDirectory() as folder:
