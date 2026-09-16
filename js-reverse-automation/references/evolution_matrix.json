@@ -1,4 +1,26 @@
 {
-  "domains": {},
-  "behavioral_features": {}
+  "version": "2.2.0",
+  "compatibility": "v2.1-final-report-preserved",
+  "iterations": [
+    {"round":1,"hardening":"runtime route indirection + entrypoint wrappers","capability":"global entrypoint plus network evidence","result":"8/8"},
+    {"round":2,"hardening":"character-code route reconstruction + non-enumerable resolver","capability":"dynamic route resolution","result":"8/8"},
+    {"round":3,"hardening":"function/API integrity snapshots + anti-debug marker","capability":"integrity and external-change observation","result":"8/8"},
+    {"round":4,"hardening":"non-writable, non-configurable entrypoints","capability":"network-first fallback when entrypoint patching is blocked","result":"8/8"},
+    {"round":5,"hardening":"CryptoJS AES and JSEncrypt Proxy layers","capability":"composed crypto primitive tracing","result":"8/8"},
+    {"round":6,"hardening":"HMAC-SHA256 and DES Proxy layers","capability":"signature and legacy cipher tracing","result":"8/8"},
+    {"round":7,"hardening":"fetch Proxy layer","capability":"network hook composition","result":"8/8"},
+    {"round":8,"hardening":"webdriver/plugins/language/visibility signals","capability":"environment-signal observation without false blocking","result":"8/8"},
+    {"round":9,"hardening":"event-loop timing anomaly check","capability":"anti-step/delay signal collection","result":"8/8"},
+    {"round":10,"hardening":"source/API fingerprints + dynamic decoys","capability":"static noise plus runtime evidence retention","result":"8/8"}
+  ],
+  "delivery_regressions": [
+    {"issue":"page functions return void after fetch","fix":"generated JSRPC captures fetch request/response during invocation"},
+    {"issue":"multiple fetches before final business request","fix":"normalized exact pathname route matching"},
+    {"issue":"success navigation interrupts repeated tests","fix":"optional capture.suppress_page_success test mode"}
+  ],
+  "limits": [
+    "suppress_page_success is test-only and does not change captured server response",
+    "cryptographic protocol strength is unchanged; hardening increases reverse-analysis cost",
+    "验证码、WebAuthn、设备证明和未导出的 WASM 内部函数 remain unsupported/manual"
+  ]
 }

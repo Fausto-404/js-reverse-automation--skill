@@ -47,6 +47,9 @@ def normalize_analysis(analysis: dict) -> dict:
             "arguments": ["value"], "returns": "unknown", "async": False
         })
         config["jsra_transform"] = transform
+        for key in ("capture", "dom_bindings", "delivery_mode"):
+            if key in transform:
+                config.setdefault(key, transform[key])
 
     # Ensure all parameters have required fields
     for name, config in parameters.items():
@@ -97,11 +100,13 @@ def candidate_verified(candidate: dict | None) -> tuple[bool, str]:
 
 def find_candidate_file(analysis_path: Path) -> Path | None:
     """Find candidate files in the artifacts directory."""
-    artifacts = analysis_path.parent
-    for name in ("encryption_candidates.json", "encryption_candidates.verified.json"):
-        path = artifacts / name
-        if path.exists():
-            return path
+    roots = (analysis_path.parent / "artifacts", analysis_path.parent)
+    for root in roots:
+        # Prefer the post-verification artifact whenever both files exist.
+        for name in ("encryption_candidates.verified.json", "encryption_candidates.json"):
+            path = root / name
+            if path.exists():
+                return path
     return None
 
 
@@ -183,6 +188,17 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
     return value;
   }}
 
+  function bindInputFields(payload, parameterConfig, raw) {{
+    const bindings = parameterConfig.dom_bindings || {{}};
+    const fields = payload.fields || (payload.context && payload.context.fields) || payload;
+    for (const [source, elementId] of Object.entries(bindings)) {{
+      const element = document.getElementById(elementId);
+      if (!element) continue;
+      const value = source === "value" ? raw : fields[source];
+      if (value !== undefined) element.value = String(value);
+    }}
+  }}
+
   function resultOrError(parameter, input, result) {{
     if (result === undefined || result === null)
       return errorValue(parameter, "InvalidResult", "page function returned no value");
@@ -191,6 +207,118 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
     if (typeof result === "string" && result.indexOf("__JSRPC_ERROR__:") === 0) return result;
     if (result instanceof ArrayBuffer) return Array.from(new Uint8Array(result));
     return result;
+  }}
+
+  function serializeRequestBody(body) {{
+    if (body == null) return null;
+    if (typeof body === "string") return body;
+    if (body instanceof URLSearchParams) return body.toString();
+    if (body instanceof FormData) {{
+      const values = {{}};
+      for (const [key, value] of body.entries())
+        values[key] = typeof value === "string" ? value : `[${{value.constructor.name}}]`;
+      return values;
+    }}
+    if (body instanceof ArrayBuffer) return `[ArrayBuffer:${{body.byteLength}}]`;
+    if (ArrayBuffer.isView(body)) return `[${{body.constructor.name}}:${{body.byteLength}}]`;
+    try {{ return JSON.stringify(body); }} catch (_) {{ return String(body); }}
+  }}
+
+  function headerObject(headers) {{
+    if (!headers) return {{}};
+    try {{ return Object.fromEntries(new Headers(headers).entries()); }}
+    catch (_) {{ return {{}}; }}
+  }}
+
+  function matchesRoute(url, expected) {{
+    if (!expected) return true;
+    try {{
+      const actualPath = new URL(url, window.location.href).pathname.replace(/\\/+$/, "");
+      const expectedPath = new URL(expected, window.location.href).pathname.replace(/\\/+$/, "");
+      return actualPath === expectedPath;
+    }} catch (_) {{
+      return String(url).split("?", 1)[0] === String(expected).split("?", 1)[0];
+    }}
+  }}
+
+  async function invokeWithNetworkCapture(fn, thisArg, args, captureConfig = {{}}) {{
+    const originalFetch = window.fetch;
+    const timeoutMs = 10000;
+    let captured = null;
+    const requests = [];
+    let resolveNetwork;
+    const networkSeen = new Promise(resolve => {{ resolveNetwork = resolve; }});
+    let restored = false;
+    const restore = () => {{
+      if (restored) return;
+      restored = true;
+      try {{
+        Object.defineProperty(window, "fetch", {{
+          configurable: true, writable: true, value: originalFetch
+        }});
+      }} catch (_) {{ try {{ window.fetch = originalFetch; }} catch (__) {{}} }}
+    }};
+
+    if (typeof originalFetch === "function") {{
+      const captureFetch = async function (input, init = {{}}) {{
+        const url = typeof input === "string" ? input : (input && input.url) || "";
+        const method = (init && init.method) || (input && input.method) || "GET";
+        const body = init && Object.prototype.hasOwnProperty.call(init, "body")
+          ? init.body : (input && input.body);
+        const response = await Reflect.apply(originalFetch, this, arguments);
+        let responseBody = null;
+        try {{ responseBody = await response.clone().json(); }} catch (_) {{
+          try {{ responseBody = await response.clone().text(); }} catch (__) {{}}
+        }}
+        const record = {{
+          url,
+          method,
+          headers: headerObject(init && init.headers),
+          requestBody: serializeRequestBody(body),
+          status: response.status,
+          response: responseBody
+        }};
+        requests.push(record);
+        const expected = String(captureConfig.url_contains || captureConfig.route || "");
+        if (matchesRoute(url, expected)) {{
+          captured = record;
+          resolveNetwork(captured);
+          if (captureConfig.suppress_page_success === true) {{
+            try {{
+              return new Response(JSON.stringify({{ success: false }}), {{
+                status: response.status,
+                headers: {{ "Content-Type": "application/json" }}
+              }});
+            }} catch (_) {{}}
+          }}
+        }}
+        return response;
+      }};
+      try {{
+        Object.defineProperty(window, "fetch", {{
+          configurable: true, writable: true, value: captureFetch
+        }});
+      }} catch (_) {{
+        try {{ window.fetch = captureFetch; }} catch (__) {{}}
+      }}
+    }}
+
+    let resultState;
+    try {{
+      const result = fn.apply(thisArg, args);
+      resultState = await Promise.race([
+        Promise.resolve(result).then(value => ({{ value }}), error => ({{ error }})),
+        new Promise(resolve => setTimeout(() => resolve({{ timedOut: true }}), timeoutMs))
+      ]);
+    }} catch (error) {{
+      resultState = {{ error }};
+    }}
+    const network = await Promise.race([
+      networkSeen,
+      new Promise(resolve => setTimeout(() => resolve(null), timeoutMs))
+    ]);
+    restore();
+    return {{ resultState, network: network || captured, requests }};
   }}
 
   if (typeof Hlclient === "undefined")
@@ -216,15 +344,33 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
       if (typeof fn !== "function")
         throw new Error("verified page entrypoint is not callable");
       const raw = payload.value;
+      bindInputFields(payload, parameterConfig, raw);
       let args = Array.isArray(payload.args) ? payload.args.map(coerce) : [coerce(raw)];
       const transform = parameterConfig.jsra_transform || {{}};
       if (Array.isArray(transform.arguments)) {{
         args = transform.arguments.map((arg) =>
           arg && arg.source === "constant" ? arg.value : coerce(raw));
       }}
-      const result = fn.apply(resolveThis(parameterConfig), args);
-      Promise.resolve(result)
-        .then((value) => resolve(resultOrError(parameter, raw, value)))
+      const captureConfig = parameterConfig.capture || transform.capture || {{}};
+      invokeWithNetworkCapture(fn, resolveThis(parameterConfig), args, captureConfig)
+        .then((invocation) => {{
+          const resultState = invocation.resultState || {{}};
+          if (resultState.error) throw resultState.error;
+          if (invocation.network) {{
+            resolve({{
+              success: true,
+              parameter,
+              plaintext: raw,
+              result: resultState.value === undefined ? null : resultState.value,
+              request: invocation.network,
+              requestBody: invocation.network.requestBody,
+              response: invocation.network.response,
+              status: invocation.network.status
+            }});
+            return;
+          }}
+          resolve(resultOrError(parameter, raw, resultState.value));
+        }})
         .catch((error) => resolve(errorValue(parameter, error.name || "Error", error.message || String(error))));
     }} catch (error) {{
       resolve(errorValue(parameter, error.name || "Error", error.message || String(error)));

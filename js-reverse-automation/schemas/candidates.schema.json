@@ -48,8 +48,7 @@
             "type": "array"
           },
           "verification": {
-            "type": "array",
-            "minItems": 1
+            "type": "array"
           },
           "provenance": {
             "type": "object",
@@ -66,7 +65,22 @@
             "additionalProperties": true
           }
         },
-        "additionalProperties": true
+        "additionalProperties": true,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "verified": { "const": true }
+              }
+            },
+            "then": {
+              "required": ["verification"],
+              "properties": {
+                "verification": { "minItems": 1 }
+              }
+            }
+          }
+        ]
       }
     }
   },

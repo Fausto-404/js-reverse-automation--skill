@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import json
 import py_compile
+import re
 import shutil
 import subprocess
 import tempfile
@@ -36,7 +38,7 @@ def check_schema(name: str, data: dict, schema_path: Path) -> dict:
         errors = [e.message for e in Draft202012Validator(schema).iter_errors(data)]
         return {"name": name, "ok": not errors, "errors": errors}
     except ImportError:
-        return {"name": name, "ok": True, "skipped": "jsonschema not installed"}
+        return {"name": name, "ok": False, "errors": ["jsonschema not installed"]}
     except FileNotFoundError:
         return {"name": name, "ok": True, "skipped": f"schema not found: {schema_path}"}
 
@@ -64,6 +66,37 @@ def check_javascript(path: Path) -> dict:
         "ok": proc.returncode == 0,
         "errors": [proc.stderr.strip()] if proc.returncode else []
     }
+
+
+def check_dependency(name: str) -> dict:
+    """Require packages used by generated services and schema validation."""
+    available = importlib.util.find_spec(name) is not None
+    return {
+        "name": f"dependency:{name}",
+        "ok": available,
+        "errors": [] if available else [f"{name} is not installed"],
+    }
+
+
+def check_jsrpc_evidence_gate(path: Path) -> dict:
+    """Fail validation when generated JSRPC code is still quarantined."""
+    if not path.exists():
+        return {"name": "jsrpc_evidence_gate", "ok": False, "errors": ["missing jsrpc_inject.js"]}
+    content = path.read_text(encoding="utf-8")
+    match = re.search(r"const EVIDENCE_ERRORS = (\{.*?\});", content, re.DOTALL)
+    if not match:
+        return {"name": "jsrpc_evidence_gate", "ok": False, "errors": ["missing evidence gate"]}
+    try:
+        errors = json.loads(match.group(1))
+    except json.JSONDecodeError as error:
+        return {"name": "jsrpc_evidence_gate", "ok": False, "errors": [str(error)]}
+    if errors:
+        return {
+            "name": "jsrpc_evidence_gate",
+            "ok": False,
+            "errors": [f"quarantined parameters: {', '.join(sorted(errors))}"],
+        }
+    return {"name": "jsrpc_evidence_gate", "ok": True, "errors": []}
 
 
 def check_candidate_invariants(candidates: dict) -> dict:
@@ -132,6 +165,7 @@ def main() -> int:
     parser.add_argument("--generated", required=True, help="Path to generated/ directory.")
     parser.add_argument("--report", required=True, help="Path to validation report JSON.")
     parser.add_argument("--e2e-result", help="Path to optional E2E result JSON.")
+    parser.add_argument("--adversarial-trace", help="Optional adversarial runtime trace JSON.")
     args = parser.parse_args()
 
     base = Path(__file__).parents[1]
@@ -139,6 +173,11 @@ def main() -> int:
     analysis = load_json(args.analysis)
 
     checks = []
+
+    # A green report must mean the generated service can start and schema
+    # checks really ran.  Missing required packages are therefore failures,
+    # not silently skipped checks.
+    checks.extend(check_dependency(name) for name in ("flask", "requests", "jsonschema"))
 
     # Layer 1: Schema validation
     schema_path = base / "schemas" / "analysis_result.schema.json"
@@ -156,8 +195,9 @@ def main() -> int:
     for name in ("flask_proxy.py",):
         path = generated / name
         checks.append(check_python(path) if path.exists() else {"name": f"python:{name}", "ok": False, "errors": ["missing"]})
-    for name in ("jsrpc_inject.js", "runtime_hook_probe.js", "module_probe.js"):
+    for name in ("jsrpc_inject.js", "runtime_hook_probe.js", "adversarial_runtime_probe.js", "module_probe.js"):
         checks.append(check_javascript(generated / name))
+    checks.append(check_jsrpc_evidence_gate(generated / "jsrpc_inject.js"))
 
     # Layer 3: Cross-file consistency
     checks.append(check_cross_file(analysis, generated))
@@ -168,8 +208,13 @@ def main() -> int:
         e2e = load_json(args.e2e_result, {})
         checks.append({"name": "real_e2e", "ok": bool(e2e.get("passed")), "details": e2e})
 
+    if args.adversarial_trace:
+        trace = load_json(args.adversarial_trace, {})
+        schema = base / "schemas" / "adversarial_trace.schema.json"
+        checks.append(check_schema("adversarial_trace_schema", trace, schema))
+
     report = {
-        "version": "2.1.0",
+        "version": "2.2.0",
         "passed": all(c.get("ok") for c in checks),
         "checks": checks
     }

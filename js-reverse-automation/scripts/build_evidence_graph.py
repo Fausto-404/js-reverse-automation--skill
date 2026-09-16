@@ -48,22 +48,54 @@ def main() -> int:
         if event.get("input_fingerprint"):
             consumers[event["input_fingerprint"]].append(event_id)
 
-    # Fingerprint flow edges (producer -> consumer)
+    # Fingerprint flow edges (producer -> consumer).  A runtime hook often
+    # creates a new trace id for the network call after the crypto call has
+    # completed, so requiring equal trace ids loses the most useful edges.
+    # Pair each consumer with the nearest preceding producer instead.  Exact
+    # fingerprints remain the proof signal; the time relation only disambiguates
+    # repeated values and prevents future-to-past edges.
     event_ids = {str(event.get("event_id")) for event in events}
     for fp, source_ids in producers.items():
-        for source_id in source_ids:
-            for target_id in consumers.get(fp, []):
-                if source_id != target_id and source_id in event_ids and target_id in event_ids:
-                    source_event = next((e for e in events if str(e.get("event_id")) == source_id), {})
-                    target_event = next((e for e in events if str(e.get("event_id")) == target_id), {})
-                    if (source_event.get("trace_id") and
-                            source_event.get("trace_id") == target_event.get("trace_id")):
-                        edges.append({
-                            "from": source_id, "to": target_id,
-                            "type": "fingerprint_flow",
-                            "fingerprint": fp,
-                            "trace_id": source_event.get("trace_id")
-                        })
+        source_events = [
+            next((event for event in events if str(event.get("event_id")) == source_id), {})
+            for source_id in source_ids
+            if source_id in event_ids
+        ]
+        for target_id in consumers.get(fp, []):
+            if target_id not in event_ids:
+                continue
+            target_event = next((e for e in events if str(e.get("event_id")) == target_id), {})
+            target_time = target_event.get("timestamp")
+            preceding = [
+                event for event in source_events
+                if str(event.get("event_id")) != target_id
+                and (
+                    not isinstance(target_time, (int, float))
+                    or not isinstance(event.get("timestamp"), (int, float))
+                    or event.get("timestamp") <= target_time
+                )
+            ]
+            if not preceding:
+                continue
+            source_event = max(
+                preceding,
+                key=lambda event: event.get("timestamp", 0)
+                if isinstance(event.get("timestamp"), (int, float)) else 0,
+            )
+            source_id = str(source_event.get("event_id"))
+            source_time = source_event.get("timestamp")
+            delta = None
+            if isinstance(source_time, (int, float)) and isinstance(target_time, (int, float)):
+                delta = max(0, target_time - source_time)
+            edges.append({
+                "from": source_id, "to": target_id,
+                "type": "fingerprint_flow",
+                "fingerprint": fp,
+                "trace_id": source_event.get("trace_id"),
+                "target_trace_id": target_event.get("trace_id"),
+                "same_trace": source_event.get("trace_id") == target_event.get("trace_id"),
+                "time_delta_ms": delta,
+            })
 
     # Temporal edges (within same trace)
     for trace_id, trace_events in by_trace.items():
@@ -82,7 +114,7 @@ def main() -> int:
         nodes.append({"id": node_id, "kind": "candidate_source", "data": item})
 
     result = {
-        "version": "2.1.0",
+        "version": "2.2.0",
         "nodes": nodes,
         "edges": edges,
         "stats": {

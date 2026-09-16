@@ -5,19 +5,19 @@
 <div align="center">
 
 <p align="center">
-  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/releases">
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/releases">
     <img src="https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?style=flat-square&label=release&color=blue&cacheSeconds=3600" alt="Release">
   </a>
 
-  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/stargazers">
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/stargazers">
     <img src="https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill?style=flat-square&label=stars&color=brightgreen&cacheSeconds=3600" alt="GitHub Stars">
   </a>
 
-  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/network/members">
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/network/members">
     <img src="https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill?style=flat-square&label=forks&color=orange&cacheSeconds=3600" alt="GitHub Forks">
   </a>
 
-  <a href="https://github.com/Fausto-404/js-reverse-automation--skill/releases">
+  <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/releases">
     <img src="https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill/total?style=flat-square&label=downloads&color=success&cacheSeconds=3600" alt="Downloads">
   </a>
 </p>
@@ -67,6 +67,10 @@
 - 全自动服务管理：JSRPC 服务器自动发现/启动，Flask 代理自动启停
 - 一键注入：代码生成 + 浏览器注入 + 注册验证全自动
 - Burp 无缝对接：生成 autoDecoder 配置文档，支持端到端联调
+- 完整验证交付：JSRPC 结果必须包含明文、最终请求 route、密文/签名、服务端响应和可复制验证命令；保持 v2.1 最终报告格式，v2.2 对抗信息追加展示
+- 对抗运行时探针：反调试、反 Hook、动态代码、环境属性、响应链和加载器事件
+- 源码级保守插桩：针对 JSVMP/混淆代码的属性读取 tap 与热点分析
+- 持久 Hook 与差分：检测 Hook 丢失、恢复观测能力，并比较基线/干预行为
 
 ## 项目结构
 ```latex
@@ -88,11 +92,15 @@ js-reverse-automation/
 ├── schemas/                          # JSON Schema 定义
 │   ├── analysis_result.schema.json
 │   ├── candidates.schema.json
-│   └── probe_dump.schema.json
+│   ├── probe_dump.schema.json
+│   └── adversarial_trace.schema.json
 ├── scripts/                          # 自动化工具脚本
 │   ├── common.py                     # 共享工具库
 │   ├── check_inputs.py               # 输入校验
 │   ├── emit_runtime_hook_probe.py    # 运行时 Hook 探针生成
+│   ├── emit_adversarial_runtime_probe.py # 对抗运行时探针生成
+│   ├── source_instrumentor.js        # 保守源码级属性插桩
+│   ├── adversarial_diff.py            # 原始/干预差分
 │   ├── emit_module_probe.py          # Webpack 模块探针生成
 │   ├── build_evidence_graph.py       # 证据图构建
 │   ├── detect_encryption.py          # 加密函数候选评分
@@ -128,7 +136,13 @@ js-reverse-automation/
 ```
 
 ## 使用示意
-1. 安装 MCP 服务
+1. 安装 Python 运行依赖
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+2. 安装 MCP 服务
 
 ```bash
 # Claude Code
@@ -138,7 +152,7 @@ codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
 # Gemini
 gemini mcp add chrome-devtools npx -y chrome-devtools-mcp@latest
 ```
-2. 将 `js-reverse-automation` 目录放入 Skill 目录，然后输入：
+3. 将 `js-reverse-automation` 目录放入 Skill 目录，然后输入：
 
 ```
 # 第一次建议带上jsrpc路径，后续流程会更稳
@@ -153,7 +167,7 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 <img width="2182" height="1444" alt="image" src="https://github.com/user-attachments/assets/a0edb08b-ef21-4059-bae5-d9a255a69d30" />
 2. 按照模版编写提示词并输入给claude【本次使用的是去除安全限制的claude + mimo-v2.5验证，旨在验证降低模型要求，skills实现效果不变】
 <img width="1810" height="1264" alt="image" src="https://github.com/user-attachments/assets/7703c06a-0f42-4c8d-b2c9-6d18172c1194" />
-3. 等待输出结果
+4. 等待输出结果
 <img width="1380" height="1462" alt="image" src="https://github.com/user-attachments/assets/9419df5c-f876-41ac-bdba-60d13a603445" />
 4. 依据结果输出测试即可
 <img width="2216" height="1612" alt="image" src="https://github.com/user-attachments/assets/557946b1-1f68-4ba7-8b6a-f794d0858b18" />
@@ -182,6 +196,12 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - **四层验证**：Schema + 静态 + 候选不变量 + 跨文件一致性
 - **Token 优化**：SKILL.md 精简 84%，参考资料按需加载，初始加载总 token 约减少 95%
 - **新增工具**：反爬分类、加密算法识别、Hook 模板库、环境补丁、AST 分析、隔离报告
+### v2.2（合并 v2.3 对抗能力）
+- **对抗运行时**：新增反调试/完整性/环境属性/动态代码/多 Realm 加载观察与持久 Hook
+- **JSVMP 增强**：新增保守源码级属性 tap，输出插桩位置和运行时热点
+- **状态差分**：新增基线与干预差分报告，区分证据增加、错误增加和真正业务成功
+- **组合稳定性**：对抗探针与加密运行时探针共享 Hook 编排器，支持叠加、外部替换重建和安全卸载
+- **证据可靠性**：原始捕获改为有界循环引用安全快照，避免 CryptoJS/JSEncrypt 对象导致导出失败
 ### v2.0 (2026-05-31)
 - **架构优化**：阶段流程从 Phase 0-9 精简为 Phase 0-8，消除冗余步骤，token 消耗减少约**40%**
 - **全自动化**：JSRPC 自动发现/启动、Flask 自动启停、浏览器自动注入，**全程只需配置 Burp**
@@ -194,4 +214,3 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - 2026-03-10: 重构为"主控文件 + 参考规则 + 生成器 + 校验器"架构
 - 2026-02-11: 新增 11 个反调试补充技能
 - 2026-02-03: 优化项目结构，支持 Claude/Codex/Trae 平台
-

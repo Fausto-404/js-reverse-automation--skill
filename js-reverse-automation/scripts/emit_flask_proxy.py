@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate a Flask proxy from analysis_result.json.
 
-Supports both v2.0 (dataBody/dataHeaders) and v2.1 (transforms-driven) modes.
+Supports both v2.0 (dataBody/dataHeaders) and v2.2 (transforms-driven) modes.
 All transforms go through JSRPC — no crypto implementation in this file.
 
 Usage:
@@ -38,6 +38,8 @@ def python_literal(value: Any) -> str:
 def normalize(analysis: dict) -> dict:
     """Normalize analysis to a common config format."""
     transforms = list(analysis.get("transforms") or [])
+    jsrpc_input = dict(analysis.get("jsrpc") or {})
+    default_action = jsrpc_input.get("action_name") or jsrpc_input.get("action") or "jsra_transform"
     if not transforms:
         # v2.0 mode: build transforms from parameters
         for name, config in (analysis.get("parameters") or {}).items():
@@ -48,12 +50,15 @@ def normalize(analysis: dict) -> dict:
                 "location": "body",
                 "content_type": "auto",
                 "path": f"$.{name}",
-                "action": name,
+                "action": default_action,
                 "candidate_path": entrypoint.get("path", ""),
                 "safe_to_invoke": False,
+                "delivery_mode": config.get("delivery_mode", "result") if isinstance(config, dict) else "result",
+                "capture": config.get("capture", {}) if isinstance(config, dict) else {},
+                "dom_bindings": config.get("dom_bindings", {}) if isinstance(config, dict) else {},
             })
 
-    jsrpc = dict(analysis.get("jsrpc") or {})
+    jsrpc = jsrpc_input
     transport = jsrpc.get("transport") if isinstance(jsrpc.get("transport"), dict) else {}
     jsrpc_config = {
         "base_url": jsrpc.get("base_url") or transport.get("go_url") or "http://127.0.0.1:12080",
@@ -69,7 +74,7 @@ def normalize(analysis: dict) -> dict:
     flask = dict(analysis.get("flask") or {})
     flask_server = dict(analysis.get("flask_server") or {})
     return {
-        "version": str(analysis.get("version", "2.1.0")),
+        "version": str(analysis.get("version", "2.2.0")),
         "jsrpc": jsrpc_config,
         "transforms": transforms,
         "flask_port": int(flask_server.get("port", flask.get("port", flask.get("listen_port", 5000)))),
@@ -109,11 +114,28 @@ def _error_detail(payload: object) -> str:
         return str(payload)
 
 
-def _extract_result(payload: object) -> object:
+def _nested_jsrpc_data(payload: object) -> object:
+    if not isinstance(payload, dict):
+        return payload
+    nested = payload.get("data")
+    if isinstance(nested, str):
+        try:
+            return json.loads(nested)
+        except ValueError:
+            return nested
+    return nested if nested is not None else payload
+
+
+def _extract_result(payload: object, transform: dict | None = None) -> object:
     if not isinstance(payload, dict):
         raise JSRPCError("JSRPC response must be a JSON object", "unexpected_response", _error_detail(payload))
     if payload.get("ok") is False or payload.get("status") in {{"error", "failed", "failure"}}:
         raise JSRPCError("JSRPC reported an error", "entrypoint_error", _error_detail(payload))
+    nested = _nested_jsrpc_data(payload)
+    if isinstance(transform, dict) and transform.get("delivery_mode") == "request_body":
+        if isinstance(nested, dict) and nested.get("requestBody") not in (None, ""):
+            return nested["requestBody"]
+        raise JSRPCError("JSRPC response has no captured requestBody", "unexpected_response", _error_detail(payload))
     for key in ("response_data", "data", "result", "value"):
         if key in payload:
             value = payload[key]
@@ -143,6 +165,8 @@ def jsrpc_call(action: str, value: object, transform: dict) -> object:
     base = str(cfg["base_url"]).rstrip("/")
     timeout = float(cfg.get("timeout_seconds", 10))
     context = {{"transform_id": transform.get("id"), "candidate_path": transform.get("candidate_path")}}
+    if transform.get("context_fields") is not None:
+        context["fields"] = transform.get("context_fields")
     param = json.dumps({{"parameter": transform.get("id"), "value": value, "context": context}}, ensure_ascii=False)
     try:
         if cfg.get("transport") == "post_json":
@@ -154,7 +178,7 @@ def jsrpc_call(action: str, value: object, transform: dict) -> object:
             payload = response.json()
         except ValueError as error:
             raise JSRPCError("JSRPC returned non-JSON data", "unexpected_response", str(error)) from error
-        return _validate_result(_extract_result(payload), value, transform)
+        return _validate_result(_extract_result(payload, transform), value, transform)
     except JSRPCError:
         raise
     except requests.Timeout as error:
@@ -202,6 +226,12 @@ def body_transforms(direction: str) -> list[dict]:
 
 def transform_json(raw: str, transforms: list[dict]) -> str:
     data = json.loads(raw or "null", object_pairs_hook=OrderedDict)
+    body_transform = next((t for t in transforms if t.get("delivery_mode") == "request_body"), None)
+    if body_transform:
+        old = json_get(data, body_transform.get("path"))
+        call_transform = dict(body_transform)
+        call_transform["context_fields"] = data
+        return str(jsrpc_call(call_transform.get("action", CONFIG["jsrpc"]["action"]), old, call_transform))
     for transform in transforms:
         old = json_get(data, transform.get("path"))
         data = json_set(data, transform.get("path"), jsrpc_call(transform.get("action", CONFIG["jsrpc"]["action"]), old, transform))
@@ -210,6 +240,14 @@ def transform_json(raw: str, transforms: list[dict]) -> str:
 
 def transform_form(raw: str, transforms: list[dict]) -> str:
     pairs = parse_qsl(raw, keep_blank_values=True, strict_parsing=False)
+    body_transform = next((t for t in transforms if t.get("delivery_mode") == "request_body"), None)
+    if body_transform:
+        fields = dict(pairs)
+        key = str(body_transform.get("path", "")).removeprefix("$.")
+        old = fields.get(key, raw)
+        call_transform = dict(body_transform)
+        call_transform["context_fields"] = fields
+        return str(jsrpc_call(call_transform.get("action", CONFIG["jsrpc"]["action"]), old, call_transform))
     for transform in transforms:
         key = str(transform.get("path", "")).removeprefix("$.")
         pairs = [

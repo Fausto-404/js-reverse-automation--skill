@@ -140,22 +140,64 @@ def build_candidates(probe: dict, modules: dict, graph: dict, analysis: dict) ->
             for c in group:
                 c["evidence"].append({"type": "cross_source_name", "sources": sources})
 
+    # === Fingerprint flow correlation ===
+    # The graph builder may correlate across trace ids when the crypto output
+    # is later serialized into a request field.  Promote that relationship to
+    # candidate evidence so request_correlation is not silently stuck at zero.
+    graph_flows_by_source: defaultdict[str, list[dict]] = defaultdict(list)
+    for edge in fingerprint_edges:
+        source_id = str(edge.get("from") or "")
+        target_id = str(edge.get("to") or "")
+        source_event = event_by_id.get(source_id, {})
+        target_event = event_by_id.get(target_id, {})
+        target_type = str(target_event.get("type") or "")
+        if source_id and target_id and target_type.startswith(("network.", "serializer.")):
+            graph_flows_by_source[source_id].append(edge)
+
+    for candidate in store.values():
+        source_event_ids = {
+            str(item.get("event_id"))
+            for item in candidate.get("evidence", [])
+            if item.get("type") == "runtime_event" and item.get("event_id")
+        }
+        flow_edges = [
+            edge for event_id in source_event_ids
+            for edge in graph_flows_by_source.get(event_id, [])
+        ]
+        if flow_edges:
+            candidate["evidence"].append({
+                "type": "fingerprint_flow",
+                "flows": [
+                    {
+                        "from": edge.get("from"),
+                        "to": edge.get("to"),
+                        "fingerprint": edge.get("fingerprint"),
+                        "same_trace": edge.get("same_trace"),
+                        "time_delta_ms": edge.get("time_delta_ms"),
+                    }
+                    for edge in flow_edges[:20]
+                ],
+            })
+        candidate["_has_fingerprint_flow"] = bool(flow_edges)
+
     # === Score each candidate ===
     for c in store.values():
         evidence_types = [e.get("type") for e in c["evidence"]]
         runtime_count = evidence_types.count("runtime_event") + evidence_types.count("runtime_stack")
         network_correlation = (
             1.0 if c["verified"]
-            else (0.5 if runtime_count and any(
+            else (0.8 if c.get("_has_fingerprint_flow") else (0.5 if runtime_count and any(
                 str(e.get("event_type", "")).startswith("network") for e in c["evidence"]
-            ) else 0.0)
+            ) else 0.0))
         )
         scores = {
             "name": keyword_score(c["name"]),
             "source_keyword": keyword_score(c.get("source_snippet", "")),
             "runtime_stack": min(1.0, runtime_count / 3),
             "request_correlation": network_correlation,
-            "input_output_flow": 1.0 if c["verified"] else (0.3 if c.get("output_fingerprints") else 0.0),
+            "input_output_flow": 1.0 if c["verified"] else (
+                0.6 if c.get("_has_fingerprint_flow") else (0.3 if c.get("output_fingerprints") else 0.0)
+            ),
             "module_export": 1.0 if c["source"] == "webpack" else (0.6 if c["source"] == "global" else 0.0),
             "cross_source": 1.0 if "cross_source_name" in evidence_types else 0.0,
             "verification": 1.0 if c["verified"] else 0.0,
@@ -173,6 +215,7 @@ def build_candidates(probe: dict, modules: dict, graph: dict, analysis: dict) ->
             else ("medium" if total >= .38 else "low")
         )
         c["evidence"] = c["evidence"][:100]
+        c.pop("_has_fingerprint_flow", None)
 
     return sorted(store.values(), key=lambda x: (x["verified"], x["total_score"]), reverse=True)
 
@@ -198,7 +241,7 @@ def main() -> int:
 
     candidates = build_candidates(probe, modules, graph, analysis)
     result = {
-        "version": "2.1.0",
+        "version": "2.2.0",
         "candidates": candidates,
         "stats": {
             "total": len(candidates),

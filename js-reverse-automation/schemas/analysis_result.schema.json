@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jsra.local/schemas/analysis_result.schema.json",
-  "title": "JSRA Analysis Result v2.1",
+  "title": "JSRA Analysis Result v2.2",
   "type": "object",
   "required": [
     "version",
@@ -11,7 +11,7 @@
   "properties": {
     "version": {
       "type": "string",
-      "pattern": "^2\\.1(?:\\.\\d+)?$"
+      "pattern": "^2\\.(?:1|2)(?:\\.\\d+)?$"
     },
     "authorization": {
       "type": "object",

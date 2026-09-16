@@ -1,0 +1,10 @@
+# Runtime outputs and local captures
+js-reverse-automation/generated/*
+js-reverse-automation/artifacts/*
+!js-reverse-automation/generated/.gitkeep
+!js-reverse-automation/artifacts/.gitkeep
+**/*.log
+**/__pycache__/
+*.pyc
+.playwright-cli/
+.DS_Store

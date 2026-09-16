@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jsra.local/schemas/adversarial_trace.schema.json",
+  "title": "JSRA Adversarial Runtime Trace v2.2",
+  "type": "object",
+  "required": ["version", "state"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^2\\.2(?:\\.\\d+)?$" },
+    "exportedAt": { "type": "integer", "minimum": 0 },
+    "state": {
+      "type": "object",
+      "required": ["version", "mode", "events", "patches", "realms", "health"],
+      "properties": {
+        "version": { "type": "string" },
+        "mode": { "enum": ["observe", "intervene"] },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
+        "patches": { "type": "array", "items": { "type": "object" } },
+        "realms": { "type": "array", "items": { "type": "object" } },
+        "dropped": { "type": "integer", "minimum": 0 },
+        "health": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "event": {
+      "type": "object",
+      "required": ["event_id", "trace_id", "type", "timestamp"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "trace_id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
+  }
+}

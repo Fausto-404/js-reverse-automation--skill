@@ -67,11 +67,34 @@ def flatten_events(probe: dict) -> list[dict]:
     """Normalise legacy probe dump collections into a flat event list.
 
     The v2.0 probe stores events in separate lists (``requests``, ``crypto``,
-    ``serializers``, ``calls``, ``encoders``).  The v2.1 probe uses a single
+    ``serializers``, ``calls``, ``encoders``).  The v2.1/v2.2 probes use a single
     ``events`` list with a ``type`` field.  This function merges both formats
     so downstream code always sees a flat list.
     """
-    events = list(probe.get("events") or [])
+    # Runtime probes store events at the top level, while the adversarial
+    # probe exports them under ``state.events``.  Accept both forms so the
+    # classifier, graph builder and candidate detector see the same evidence.
+    events: list[dict] = []
+    seen_ids: set[str] = set()
+
+    def add_events(items: object) -> None:
+        if not isinstance(items, list):
+            return
+        for raw in items:
+            if not isinstance(raw, dict):
+                continue
+            event = dict(raw)
+            event_id = str(event.get("event_id") or "")
+            if event_id and event_id in seen_ids:
+                continue
+            if event_id:
+                seen_ids.add(event_id)
+            events.append(event)
+
+    add_events(probe.get("events"))
+    state = probe.get("state")
+    if isinstance(state, dict):
+        add_events(state.get("events"))
     mapping = {
         "requests": "network.request",
         "crypto": "crypto.operation",
@@ -85,7 +108,7 @@ def flatten_events(probe: dict) -> list[dict]:
             event.setdefault("type", default_type)
             event.setdefault("event_id", f"legacy-{collection}-{index}")
             event.setdefault("timestamp", index)
-            events.append(event)
+            add_events([event])
     return events
 
 

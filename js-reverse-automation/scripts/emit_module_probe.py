@@ -19,7 +19,7 @@ from pathlib import Path
 PROBE = r'''(() => {
   "use strict";
   const dump = {
-    version: "2.1.0",
+    version: "2.2.0",
     timestamp: Date.now(),
     bundlers: [],
     modules: [],
