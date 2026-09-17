@@ -28,6 +28,10 @@
   <strong>结合chrome-devtools-mcp的能力并加上Skill的规范，实现JSRPC+Flask+autoDecoder方案的前端JS逆向自动化分析，提升JS逆向的效率</strong>
 </p>
 
+<p align="center">
+  <strong>当前版本：v2.2（包含 v2.3 对抗能力）</strong>
+</p>
+
 
 ## 适用场景
 
@@ -203,6 +207,8 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - **组合稳定性**：对抗探针与加密运行时探针共享 Hook 编排器，支持叠加、外部替换重建和安全卸载
 - **证据可靠性**：原始捕获改为有界循环引用安全快照，避免 CryptoJS/JSEncrypt 对象导致导出失败
 - **传输覆盖**：JSRPC 最终请求捕获统一覆盖 fetch 与 XMLHttpRequest，并清理成功调用后的超时计时器
+- **K01 流程修复**：修复运行时探针在缺失值和动态对象场景下的稳定性问题，过滤探针自身产生的干扰事件，保留真实业务请求证据
+- **输出兼容**：继续保持 v2.1 的最终交付格式，对抗信息作为补充证据追加，不改变明文、密文、JSRPC、Flask、Burp 和验证命令的输出规范
 ### v2.0 (2026-05-31)
 - **架构优化**：阶段流程从 Phase 0-9 精简为 Phase 0-8，消除冗余步骤，token 消耗减少约**40%**
 - **全自动化**：JSRPC 自动发现/启动、Flask 自动启停、浏览器自动注入，**全程只需配置 Burp**
