@@ -115,7 +115,6 @@ function main() {
   else analyzeFallback(code, map);
 
   const result = {
-    version: "2.2.0",
     input: path.resolve(opt.input),
     parser_mode: babelParser ? "babel" : "fallback-regex",
     candidates: Array.from(map.values())

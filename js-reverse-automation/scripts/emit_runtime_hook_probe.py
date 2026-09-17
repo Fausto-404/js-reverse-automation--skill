@@ -21,12 +21,12 @@ HOOK_REGISTRY = (Path(__file__).with_name("hook_registry.js")).read_text(encodin
 
 TEMPLATE = r'''(() => {
   "use strict";
-  const VERSION = "2.2.0";
+  const PROBE_ID = "runtime-hook";
   const CONFIG = __CONFIG__;
   const root = window;
 __HOOK_REGISTRY__
   const registry = getHookRegistry(root);
-  if (window.__JSRA_TRACE__ && window.__JSRA_TRACE__.version === VERSION) {
+  if (window.__JSRA_TRACE__ && window.__JSRA_TRACE__.probe_id === PROBE_ID) {
     return window.__JSRA_TRACE__;
   }
 
@@ -36,7 +36,7 @@ __HOOK_REGISTRY__
     ? registry.native(crypto.subtle, "digest").bind(crypto.subtle) : null;
   const nativeTextEncode = window.TextEncoder
     ? registry.native(TextEncoder.prototype, "encode") : null;
-  const state = { version: VERSION, installedAt: Date.now(), events: [], maxEvents: CONFIG.maxEvents, dropped: 0 };
+  const state = { probe_id: PROBE_ID, installedAt: Date.now(), events: [], maxEvents: CONFIG.maxEvents, dropped: 0 };
   let eventCounter = 0;
   let activeTraceId = null;
   let libraryTimer = null;
@@ -290,12 +290,12 @@ __HOOK_REGISTRY__
 
   // === Public API ===
   window.__JSRA_TRACE__ = {
-    version: VERSION,
+    probe_id: PROBE_ID,
     state,
     markTrace(label = "manual") { activeTraceId = uuid(label); return activeTraceId; },
     clearTrace() { activeTraceId = null; },
     async record(type, detail) { return record(type, detail); },
-    export() { return { version: VERSION, exportedAt: Date.now(), events: state.events.slice() }; },
+    export() { return { probe_id: PROBE_ID, exportedAt: Date.now(), events: state.events.slice() }; },
     dump() { return nativeJSONStringify(this.export()); },
     uninstall() {
       if (libraryTimer) clearInterval(libraryTimer);
@@ -303,7 +303,7 @@ __HOOK_REGISTRY__
       if (originalRequest) window.Request = originalRequest;
     }
   };
-  console.info("[JSRA] runtime probe installed", VERSION);
+  console.info("[JSRA] runtime probe installed");
   return window.__JSRA_TRACE__;
 })();
 '''
@@ -323,7 +323,7 @@ def main() -> int:
     config = {"maxEvents": max(100, args.max_events), "captureRaw": bool(args.capture_raw),
               "controlWebSocketUrls": control_urls}
     # --params is retained for backward compatibility but not used in the probe
-    # (the v2.2 probe watches all crypto-related activity automatically)
+    # The probe watches all crypto-related activity automatically.
     if args.params:
         config["targetParams"] = [p.strip() for p in args.params.split(",") if p.strip()]
     content = TEMPLATE.replace("__CONFIG__", json.dumps(config))

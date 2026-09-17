@@ -75,7 +75,6 @@ def normalize(analysis: dict) -> dict:
     flask = dict(analysis.get("flask") or {})
     flask_server = dict(analysis.get("flask_server") or {})
     return {
-        "version": str(analysis.get("version", "2.2.0")),
         "jsrpc": jsrpc_config,
         "transforms": transforms,
         "flask_port": int(flask_server.get("port", flask.get("port", flask.get("listen_port", 5000)))),
@@ -93,7 +92,7 @@ from __future__ import annotations
 import json
 import os
 from collections import OrderedDict
-from urllib.parse import parse_qsl, urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from flask import Flask, Response, jsonify, request
@@ -236,8 +235,68 @@ def body_value(data: object, raw: str, transform: dict) -> object:
     return raw
 
 
+def transforms_for(direction: str, location: str) -> list[dict]:
+    return [t for t in CONFIG["transforms"] if t.get("direction") == direction and t.get("location") == location]
+
+
 def body_transforms(direction: str) -> list[dict]:
-    return [t for t in CONFIG["transforms"] if t.get("direction") == direction and t.get("location") in ("body", "response")]
+    return transforms_for(direction, "body") + transforms_for(direction, "response")
+
+
+def transform_key(transform: dict) -> str:
+    path = str(transform.get("path") or "")
+    return path.removeprefix("$.headers.").removeprefix("$.cookies.").removeprefix("$.cookie.").removeprefix("$.").split(".")[-1]
+
+
+def transform_query_target(target: str, transforms: list[dict]) -> str:
+    if not transforms or "?" not in target:
+        return target
+    parts = urlsplit(target)
+    pairs = parse_qsl(parts.query, keep_blank_values=True, strict_parsing=False)
+    keys = {{transform_key(t): t for t in transforms}}
+    updated = []
+    for name, value in pairs:
+        transform = keys.get(name)
+        if transform:
+            value = str(jsrpc_call(transform.get("action", CONFIG["jsrpc"]["action"]), value, transform))
+        updated.append((name, value))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(updated, doseq=True), parts.fragment))
+
+
+def transform_cookie_value(value: str, transforms: list[dict]) -> str:
+    keys = {{transform_key(t): t for t in transforms}}
+    pairs = []
+    for item in value.split(";"):
+        name, separator, current = item.strip().partition("=")
+        if not separator:
+            pairs.append(item.strip())
+            continue
+        transform = keys.get(name)
+        if transform:
+            current = str(jsrpc_call(transform.get("action", CONFIG["jsrpc"]["action"]), current, transform))
+        pairs.append(f"{{name}}={{current}}")
+    return "; ".join(pairs)
+
+
+def transform_headers(header_block: str, direction: str) -> str:
+    header_transforms = transforms_for(direction, "header")
+    cookie_transforms = transforms_for(direction, "cookie")
+    if not header_transforms and not cookie_transforms:
+        return header_block
+    by_name = {{transform_key(t).lower(): t for t in header_transforms}}
+    lines = []
+    for line in header_block.splitlines():
+        if ":" not in line:
+            lines.append(line)
+            continue
+        name, value = line.split(":", 1)
+        transform = by_name.get(name.strip().lower())
+        if transform:
+            value = " " + str(jsrpc_call(transform.get("action", CONFIG["jsrpc"]["action"]), value.strip(), transform))
+        if name.strip().lower() == "cookie" and cookie_transforms:
+            value = " " + transform_cookie_value(value.strip(), cookie_transforms)
+        lines.append(name + ":" + value)
+    return "\\r\\n".join(lines)
 
 
 def transform_json(raw: str, transforms: list[dict]) -> str:
@@ -289,6 +348,21 @@ def apply_body(raw: str, content_type: str, transforms: list[dict]) -> str:
     raise ValueError("Unsupported content type: " + content_type)
 
 
+def apply_packet(header_block: str, body: str, separator: str, direction: str, content_type: str) -> str:
+    """Apply query/header/cookie/body transforms while preserving the packet."""
+    lines = header_block.splitlines()
+    if lines:
+        query_transforms = transforms_for(direction, "query")
+        if query_transforms:
+            request_line = lines[0].split(" ", 2)
+            if len(request_line) >= 2:
+                request_line[1] = transform_query_target(request_line[1], query_transforms)
+                lines[0] = " ".join(request_line)
+    transformed_headers = transform_headers("\\r\\n".join(lines), direction)
+    transformed_body = apply_body(body, content_type, body_transforms(direction))
+    return rebuild_http_packet(transformed_headers, separator, transformed_body)
+
+
 def split_http_packet(raw: str) -> tuple[str, str, str] | None:
     """Split a Burp autoDecoder raw packet into headers and body."""
     if not raw:
@@ -329,7 +403,7 @@ def rebuild_http_packet(header_block: str, separator: str, body: str) -> str:
 
 @app.get("/health")
 def health():
-    return jsonify({{"status": "ok", "version": CONFIG["version"], "jsrpc": CONFIG["jsrpc"]["base_url"]}})
+    return jsonify({{"status": "ok", "service": "jsra-flask", "jsrpc": CONFIG["jsrpc"]["base_url"]}})
 
 
 @app.get("/healthz")
@@ -377,12 +451,12 @@ def autodecoder():
         if packet:
             header_block, separator, body = packet
             content_type = request.headers.get("X-JSRA-Content-Type", packet_content_type(header_block))
-            transformed = apply_body(body, content_type, body_transforms(direction))
-            return Response(rebuild_http_packet(header_block, separator, transformed), content_type="text/plain; charset=utf-8")
+            return Response(apply_packet(header_block, body, separator, direction, content_type), content_type="text/plain; charset=utf-8")
+        transformed_headers = transform_headers(wrapped_headers, direction) if wrapped_headers is not None else None
         transformed = apply_body(raw, content_type, body_transforms(direction))
         if wrapped_body is not None and wrapped_headers is not None:
             # autoDecoder expects this exact separator when header handling is enabled.
-            return Response(wrapped_headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + transformed, content_type="text/plain; charset=utf-8")
+            return Response(transformed_headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + transformed, content_type="text/plain; charset=utf-8")
         return Response(transformed, content_type="text/plain; charset=utf-8")
     except JSRPCError as error:
         return Response("JSRA_ERROR: " + str(error), status=502, content_type="text/plain; charset=utf-8")

@@ -241,7 +241,6 @@ def main() -> int:
 
     candidates = build_candidates(probe, modules, graph, analysis)
     result = {
-        "version": "2.2.0",
         "candidates": candidates,
         "stats": {
             "total": len(candidates),

@@ -1,4 +1,4 @@
-// Shared v2.2 hook composition runtime.
+// Shared hook composition runtime.
 // The function stays local to each generated probe while the registry state is
 // shared through window, allowing independently generated probes to compose.
 function getHookRegistry(root) {

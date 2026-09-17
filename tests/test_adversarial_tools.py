@@ -1,4 +1,6 @@
 import json
+import importlib.util
+import socket
 import subprocess
 import sys
 import tempfile
@@ -11,7 +13,7 @@ JSRA = ROOT / "js-reverse-automation"
 
 
 class AdversarialToolTests(unittest.TestCase):
-    def test_v22_probe_contract_preserves_composition_and_safe_raw(self):
+    def test_probe_contract_preserves_composition_and_safe_raw(self):
         with tempfile.TemporaryDirectory() as folder:
             folder = Path(folder)
             adversarial = folder / "adversarial.js"
@@ -29,7 +31,7 @@ class AdversarialToolTests(unittest.TestCase):
                 checked = subprocess.run(["node", "--check", str(output)], capture_output=True, text=True)
                 self.assertEqual(checked.returncode, 0, checked.stderr)
                 content = output.read_text(encoding="utf-8")
-                self.assertIn('const VERSION = "2.2.0"', content)
+                self.assertIn('const PROBE_ID = "adversarial-runtime"' if script.startswith("emit_adversarial") else 'const PROBE_ID = "runtime-hook"', content)
                 self.assertIn("function getHookRegistry", content)
                 self.assertIn("__JSRA_HOOK_REGISTRY__", content)
             self.assertIn("function safeClone", runtime.read_text(encoding="utf-8"))
@@ -317,6 +319,68 @@ global.__action(value => console.log(JSON.stringify(value)), { parameter: "passw
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(output.read_text())["verdict"], "inconclusive")
+
+    def test_generated_proxy_rewrites_query_header_and_cookie_locations(self):
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            analysis = folder / "analysis.json"
+            output = folder / "flask_proxy.py"
+            analysis.write_text(json.dumps({
+                "transforms": [
+                    {"id": "q", "direction": "request", "location": "query", "path": "$.q", "action": "encode"},
+                    {"id": "x-sign", "direction": "request", "location": "header", "path": "$.headers.X-Sign", "action": "encode"},
+                    {"id": "sid", "direction": "request", "location": "cookie", "path": "$.cookies.sid", "action": "encode"},
+                ],
+                "jsrpc": {"action_name": "encode", "base_url": "http://127.0.0.1:12080"},
+                "flask": {"port": 5000},
+            }), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(JSRA / "scripts/emit_flask_proxy.py"), "--analysis", str(analysis), "--output", str(output)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            spec = importlib.util.spec_from_file_location("generated_proxy", output)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            module.jsrpc_call = lambda action, value, transform: f"{value}-enc"
+            packet = "POST /login?q=plain HTTP/1.1\r\nX-Sign: plain\r\nCookie: sid=plain; other=keep\r\nContent-Length: 0\r\n\r\n"
+            rewritten = module.apply_packet(packet.split("\r\n\r\n")[0], "", "\r\n\r\n", "request", "application/x-www-form-urlencoded")
+            self.assertIn("/login?q=plain-enc", rewritten)
+            self.assertIn("X-Sign: plain-enc", rewritten)
+            self.assertIn("Cookie: sid=plain-enc; other=keep", rewritten)
+
+    def test_burp_doc_uses_actual_status_port(self):
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            analysis = folder / "analysis.json"
+            status = folder / "flask_status.json"
+            output = folder / "burp.md"
+            analysis.write_text(json.dumps({"flask": {"port": 5000}, "parameters": {"password": {}}}), encoding="utf-8")
+            status.write_text(json.dumps({
+                "status": "started", "port": 5017,
+                "encode_url": "http://127.0.0.1:5017/encode",
+                "decode_url": "http://127.0.0.1:5017/decode",
+            }), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(JSRA / "scripts/emit_burp_doc.py"), "--analysis", str(analysis), "--status", str(status), "--output", str(output)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            content = output.read_text(encoding="utf-8")
+            self.assertIn("127.0.0.1:5017/encode", content)
+            self.assertNotIn("127.0.0.1:5000/encode", content)
+
+    def test_port_fallback_never_uses_occupied_port(self):
+        sys.path.insert(0, str(JSRA / "scripts"))
+        from manage_services import find_available_port
+
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            occupied = listener.getsockname()[1]
+            fallback = find_available_port(occupied, attempts=4)
+            self.assertIsNotNone(fallback)
+            self.assertNotEqual(fallback, occupied)
 
 
 if __name__ == "__main__":

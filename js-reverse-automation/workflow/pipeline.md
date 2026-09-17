@@ -7,8 +7,20 @@ python3 scripts/doctor.py --ci
 ```
 
 ## Phase 0: 输入校验
+将用户提供的三行输入先整理为一个 JSON 文件（例如 `artifacts/raw_input.json`）：
+
+```json
+{
+  "target_url": "https://xxx/login",
+  "parameters": ["password"],
+  "fetch_example": "fetch(\"https://xxx/api/login\", {})"
+}
+```
+
+再执行：
+
 ```bash
-python3 scripts/check_inputs.py --input <raw> --output artifacts/phase0_input.json
+python3 scripts/check_inputs.py --input artifacts/raw_input.json --output artifacts/phase0_input.json
 ```
 
 ## Phase 0.5: Fetch Example 预分析（如果有）
@@ -120,7 +132,7 @@ curl -sS --get \
 
 ## Phase 7: Burp 文档
 ```bash
-python3 scripts/emit_burp_doc.py --analysis analysis_result.json --output generated/burp-autodecoder.md
+python3 scripts/emit_burp_doc.py --analysis analysis_result.json --status artifacts/flask_status.json --output generated/burp-autodecoder.md
 ```
 
 ## Phase 8: 校验

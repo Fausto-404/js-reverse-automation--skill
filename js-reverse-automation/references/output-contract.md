@@ -41,11 +41,23 @@ JSRPC 验证输出必须能证明完整链路：`plaintext`、最终目标 `rout
 | `generated/burp-autodecoder.md` | `emit_burp_doc.py` | Burp 文档 |
 | `generated/adversarial_runtime_probe.js` | `emit_adversarial_runtime_probe.py` | 对抗运行时探针 |
 
-## analysis_result.json 必需字段
+## analysis_result.json 契约
+
+Schema 层只强制授权和目标信息：
+
+- `authorization.confirmed=true`
+- `target.url_pattern`
+- `transforms` 或 `parameters` 至少存在一个
+
+最终交付结果还必须尽可能提供以下运行信息；缺失时必须明确标记为
+`unsupported`、`manual_observed_only` 或未完成，不能伪造成功：
+
 - `skill`、`input`、`trace`、`parameters`
 - `jsrpc`、`flask`、`burp`、`diagnostics`
 - `entrypoint_discovery`、`module_runtime`、`invocation`
 - `capability_boundary`、`runtime_trace`、`runtime_health`
+
+分析结果不再携带交付版本号；协议兼容性由当前 Schema 和生成器共同定义。
 
 ## 候选不变量
 - `verified=true` 必须有 verification 证据

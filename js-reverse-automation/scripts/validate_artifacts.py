@@ -213,11 +213,7 @@ def main() -> int:
         schema = base / "schemas" / "adversarial_trace.schema.json"
         checks.append(check_schema("adversarial_trace_schema", trace, schema))
 
-    report = {
-        "version": "2.2.0",
-        "passed": all(c.get("ok") for c in checks),
-        "checks": checks
-    }
+    report = {"passed": all(c.get("ok") for c in checks), "checks": checks}
     dump_json(args.report, report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["passed"] else 2

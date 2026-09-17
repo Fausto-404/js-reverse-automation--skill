@@ -17,6 +17,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Burp autoDecoder integration guide.")
     parser.add_argument("--analysis", required=True, help="Path to analysis_result.json.")
     parser.add_argument("--output", required=True, help="Output markdown file path.")
+    parser.add_argument("--status", default="", help="Optional Flask status JSON; uses the actual fallback port when present.")
     args = parser.parse_args()
 
     analysis = load_json(args.analysis)
@@ -24,11 +25,14 @@ def main() -> int:
     flask_server = analysis.get("flask_server", {})
     jsrpc = analysis.get("jsrpc", {})
     port = flask.get("port", flask_server.get("port", 5000))
+    status = load_json(args.status, {}) if args.status else {}
+    if status.get("status") == "started" and status.get("port"):
+        port = status["port"]
     transforms = analysis.get("transforms") or []
     parameters = list(analysis.get("parameters", {}).keys())
     proxy_url = f"http://127.0.0.1:{port}{flask.get('route', '/autodecoder')}"
-    encode_url = f"http://127.0.0.1:{port}/encode"
-    decode_url = f"http://127.0.0.1:{port}/decode"
+    encode_url = status.get("encode_url", f"http://127.0.0.1:{port}/encode")
+    decode_url = status.get("decode_url", f"http://127.0.0.1:{port}/decode")
     jsrpc_port = analysis.get("jsrpc_server", {}).get("port", 12080)
     group = jsrpc.get("group", "jsra")
     action = jsrpc.get("action_name", "encode_password")
@@ -61,7 +65,7 @@ def main() -> int:
 - Healthz：`http://127.0.0.1:{port}/healthz`
 - 转换接口：`http://127.0.0.1:{port}/autodecoder?direction=request`
 - 响应接口：`http://127.0.0.1:{port}/autodecoder?direction=response`
-- 如果配置端口被占用，使用 `artifacts/flask_status.json` 中实际返回的 `port`、`encode_url` 和 `decode_url`，不要继续使用默认端口。
+- 当前服务端口：`{port}`。如果服务启动时发生端口回退，文档优先使用 `artifacts/flask_status.json` 中的实际地址。
 {transform_table}
 ## 配置原则
 

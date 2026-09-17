@@ -19,19 +19,18 @@ import json
 from pathlib import Path
 
 
-VERSION = "2.2.0"
 HOOK_REGISTRY = (Path(__file__).with_name("hook_registry.js")).read_text(encoding="utf-8")
 
 TEMPLATE = r'''(() => {
   "use strict";
-  const VERSION = "2.2.0";
+  const PROBE_ID = "adversarial-runtime";
   const CONFIG = __CONFIG__;
   const KEYWORDS = /pass(word)?|token|secret|authorization|cookie|session|credential/i;
   const root = window;
 __HOOK_REGISTRY__
   const registry = getHookRegistry(root);
 
-  if (root.__JSRA_ADVERSARIAL__ && root.__JSRA_ADVERSARIAL__.version === VERSION) {
+  if (root.__JSRA_ADVERSARIAL__ && root.__JSRA_ADVERSARIAL__.probe_id === PROBE_ID) {
     return root.__JSRA_ADVERSARIAL__;
   }
 
@@ -50,7 +49,7 @@ __HOOK_REGISTRY__
   };
 
   const state = {
-    version: VERSION,
+    probe_id: PROBE_ID,
     mode: CONFIG.mode,
     installedAt: Date.now(),
     events: [],
@@ -344,9 +343,9 @@ __HOOK_REGISTRY__
     emit("probe.restored");
   }
   const api = {
-    version: VERSION,
+    probe_id: PROBE_ID,
     state,
-    export() { return { version: VERSION, exportedAt: Date.now(), state: { ...state, events: state.events.slice(), patches: state.patches.map(p => ({ name: p.name, key: p.key, installed: p.installed })) } }; },
+    export() { return { probe_id: PROBE_ID, exportedAt: Date.now(), state: { ...state, events: state.events.slice(), patches: state.patches.map(p => ({ name: p.name, key: p.key, installed: p.installed })) } }; },
     clear() { state.events.length = 0; state.dropped = 0; state.suppressed = 0; state.suppressedByPath = {}; },
     uninstall: restore,
     markTrace(label = "manual") { return id(label); }
@@ -401,7 +400,7 @@ def main() -> int:
     content = TEMPLATE.replace("__CONFIG__", json.dumps(config, ensure_ascii=False))
     content = content.replace("__HOOK_REGISTRY__", HOOK_REGISTRY)
     output.write_text(content, encoding="utf-8")
-    print(json.dumps({"status": "ok", "version": VERSION, "output": str(output), "mode": args.mode}, ensure_ascii=False))
+    print(json.dumps({"status": "ok", "output": str(output), "mode": args.mode}, ensure_ascii=False))
     return 0
 
 

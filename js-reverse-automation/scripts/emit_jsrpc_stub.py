@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate JSRPC injection code from analysis_result.json.
 
-Supports both v2.0 parameter-based config and v2.1 transforms-based config.
+Supports parameter-based and transforms-based configuration.
 Includes evidence gating: unverified candidates return __JSRPC_ERROR__:EvidenceMissing.
 
 Usage:
@@ -29,7 +29,7 @@ def parameter_name(transform: dict) -> str:
 
 
 def normalize_analysis(analysis: dict) -> dict:
-    """Normalize analysis to a common format, supporting both v2.0 and v2.1 styles."""
+    """Normalize analysis to a common format."""
     transforms = list(analysis.get("transforms") or [])
     raw_parameters = analysis.get("parameters") or {}
     parameters: dict[str, dict] = {str(k): dict(v) for k, v in raw_parameters.items() if isinstance(v, dict)}

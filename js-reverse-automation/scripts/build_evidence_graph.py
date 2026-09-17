@@ -114,7 +114,6 @@ def main() -> int:
         nodes.append({"id": node_id, "kind": "candidate_source", "data": item})
 
     result = {
-        "version": "2.2.0",
         "nodes": nodes,
         "edges": edges,
         "stats": {

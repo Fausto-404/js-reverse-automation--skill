@@ -110,7 +110,7 @@ JS_TEMPLATE = r'''(() => {
       });
     }
     window.__JSRA_VERIFICATION_RESULTS__ = {
-      version: "2.2.0", generatedAt: Date.now(), results
+      generatedAt: Date.now(), results
     };
     return window.__JSRA_VERIFICATION_RESULTS__;
   }
@@ -144,7 +144,7 @@ def build_plan(analysis: dict, candidates: dict) -> dict:
                     transform.get("expected_fingerprints", {}) or expected_by_sample
                 )
             })
-    return {"version": "2.2.0", "items": items}
+    return {"items": items}
 
 
 def emit(args: argparse.Namespace) -> int:

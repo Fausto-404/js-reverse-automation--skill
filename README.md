@@ -29,9 +29,7 @@
 </p>
 
 <p align="center">
-  <strong>当前版本：v2.2（包含 v2.3 对抗能力）</strong>
 </p>
-
 
 ## 适用场景
 
@@ -71,7 +69,7 @@
 - 全自动服务管理：JSRPC 服务器自动发现/启动，Flask 代理自动启停
 - 一键注入：代码生成 + 浏览器注入 + 注册验证全自动
 - Burp 无缝对接：生成 autoDecoder 配置文档，支持端到端联调
-- 完整验证交付：JSRPC 结果必须包含明文、最终请求 route、密文/签名、服务端响应和可复制验证命令；保持 v2.1 最终报告格式，v2.2 对抗信息追加展示
+- 完整验证交付：JSRPC 结果必须包含明文、最终请求 route、密文/签名、服务端响应和可复制验证命令；对抗信息作为补充证据展示
 - 对抗运行时探针：反调试、反 Hook、动态代码、环境属性、响应链和加载器事件
 - 源码级保守插桩：针对 JSVMP/混淆代码的属性读取 tap 与热点分析
 - 持久 Hook 与差分：检测 Hook 丢失、恢复观测能力，并比较基线/干预行为
@@ -169,7 +167,7 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 ## 效果检验
 1. 获取输入所需信息【参考如图1、2、3】
 <img width="2182" height="1444" alt="image" src="https://github.com/user-attachments/assets/a0edb08b-ef21-4059-bae5-d9a255a69d30" />
-2. 按照模版编写提示词并输入给claude【本次使用的是去除安全限制的claude + mimo-v2.5验证，旨在验证降低模型要求，skills实现效果不变】
+2. 按照模版编写提示词并输入给支持 MCP 的模型进行验证
 <img width="1810" height="1264" alt="image" src="https://github.com/user-attachments/assets/7703c06a-0f42-4c8d-b2c9-6d18172c1194" />
 4. 等待输出结果
 <img width="1380" height="1462" alt="image" src="https://github.com/user-attachments/assets/9419df5c-f876-41ac-bdba-60d13a603445" />
@@ -192,30 +190,10 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - autoDecoder：https://github.com/f0ng/autoDecoder 
 - chrome-devtools-mcp：https://github.com/ChromeDevTools/chrome-devtools-mcp/ 
 
-## 更新日志
-### v2.1 (2026-07-28)
-- **证据驱动**：SHA-256 指纹关联、证据图构建、差分验证，从"可能对"变成"确认对"
-- **扩展 Hook**：WebSocket/Request/TextEncoder/btoa/CryptoJS/JSEncrypt/sm2/sm3/sm4，覆盖更多加密场景
-- **降级策略链**：5 级降级，不轻易放弃，模块内部加密也能处理
-- **四层验证**：Schema + 静态 + 候选不变量 + 跨文件一致性
-- **Token 优化**：SKILL.md 精简 84%，参考资料按需加载，初始加载总 token 约减少 95%
-- **新增工具**：反爬分类、加密算法识别、Hook 模板库、环境补丁、AST 分析、隔离报告
-### v2.2（2026-09-17，对比 v2.1）
-- **对抗分析能力增强**：从单纯定位加密入口扩展到反调试、完整性校验、环境属性探测、动态代码执行和多 Realm 加载链路的运行时观测，并支持持久化 Hook。
-- **JSVMP 分析能力增强**：增加保守源码级属性 tap 和运行时热点关联，在不破坏原始逻辑的前提下辅助定位虚拟机指令分发、状态读取和关键数据流。
-- **因果验证能力增强**：引入基线/干预状态差分，将新增证据、异常增长、Hook 失效和真实业务成功分开，降低把探针回显或链路噪声误判为有效结果的概率。
-- **探针编排能力增强**：对抗探针与加密运行时探针统一编排，支持多探针叠加、外部脚本替换后的重建、重复注入检测和安全卸载，提升复杂页面上的持续观测能力。
-- **动态证据可靠性增强**：对运行时捕获采用有界、循环引用安全的快照策略，兼容 CryptoJS、JSEncrypt 及动态对象，减少复杂对象导致的报告中断和证据丢失。
-- **传输链路覆盖增强**：最终请求证据统一覆盖 fetch 与 XMLHttpRequest，并关联请求生成、加密输出和服务端响应，提升异步、多请求和混合传输场景下的完整性。
-### v2.0 (2026-05-31)
-- **架构优化**：阶段流程从 Phase 0-9 精简为 Phase 0-8，消除冗余步骤，token 消耗减少约**40%**
-- **全自动化**：JSRPC 自动发现/启动、Flask 自动启停、浏览器自动注入，**全程只需配置 Burp**
-- **更强入口定位**：运行时 Hook 探针 + Webpack 模块解析 + 7 维度候选评分，提供更强大、更快速的入口定位能力，**对模型要求降低**
-- **更稳定输出**：capability_boundary 显式声明不支持场景、runtime_health 健康检测、候选验证机制
-### v1版本更新记录
-- 2026-05-21: 引入 Phase 9 经验沉淀与对抗库演进
-- 2026-04-10: 补强请求复现、参数入口定位、反检测验证能力
-- 2026-03-19: 添加对抗 AI 识别为高风险操作的能力
-- 2026-03-10: 重构为"主控文件 + 参考规则 + 生成器 + 校验器"架构
-- 2026-02-11: 新增 11 个反调试补充技能
-- 2026-02-03: 优化项目结构，支持 Claude/Codex/Trae 平台
+## 能力概览
+
+- 证据驱动的运行时 Hook、请求字段关联和候选差分验证
+- 反调试、完整性、环境属性、动态代码、多 Realm 和加载器观测
+- JSVMP 场景的保守源码属性 tap 与运行时热点关联
+- JSRPC、Flask 和 Burp autoDecoder 的完整交付链路
+- 端口占用自动回退、状态文件身份校验和失败关闭保护

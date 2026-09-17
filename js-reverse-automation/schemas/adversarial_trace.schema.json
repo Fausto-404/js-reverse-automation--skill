@@ -1,17 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jsra.local/schemas/adversarial_trace.schema.json",
-  "title": "JSRA Adversarial Runtime Trace v2.2",
+  "title": "JSRA Adversarial Runtime Trace",
   "type": "object",
-  "required": ["version", "state"],
+  "required": ["state"],
   "properties": {
-    "version": { "type": "string", "pattern": "^2\\.2(?:\\.\\d+)?$" },
     "exportedAt": { "type": "integer", "minimum": 0 },
     "state": {
       "type": "object",
-      "required": ["version", "mode", "events", "patches", "realms", "health"],
+      "required": ["mode", "events", "patches", "realms", "health"],
       "properties": {
-        "version": { "type": "string" },
         "mode": { "enum": ["observe", "intervene"] },
         "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
         "patches": { "type": "array", "items": { "type": "object" } },

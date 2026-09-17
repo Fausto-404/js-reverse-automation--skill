@@ -15,9 +15,6 @@ from pathlib import Path
 from common import dump_json, load_json
 
 
-VERSION = "2.2.0"
-
-
 def events(value: dict) -> list[dict]:
     state = value.get("state") if isinstance(value, dict) else {}
     raw = state.get("events", []) if isinstance(state, dict) else []
@@ -51,7 +48,6 @@ def main() -> int:
     errors_not_increased = after["errors"] <= before["errors"]
     evidence_increased = after["events"] > before["events"] or after["requests"] > before["requests"]
     result = {
-        "version": VERSION,
         "baseline": before,
         "patched": after,
         "delta": {

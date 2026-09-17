@@ -66,8 +66,8 @@ def redact(value: Any, key: str = "", max_len: int = 96) -> Any:
 def flatten_events(probe: dict) -> list[dict]:
     """Normalise legacy probe dump collections into a flat event list.
 
-    The v2.0 probe stores events in separate lists (``requests``, ``crypto``,
-    ``serializers``, ``calls``, ``encoders``).  The v2.1/v2.2 probes use a single
+    Older probes may store events in separate lists (``requests``, ``crypto``,
+    ``serializers``, ``calls``, ``encoders``). Current probes use a single
     ``events`` list with a ``type`` field.  This function merges both formats
     so downstream code always sees a flat list.
     """

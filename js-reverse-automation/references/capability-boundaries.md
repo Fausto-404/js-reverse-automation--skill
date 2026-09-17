@@ -17,6 +17,7 @@
 - CSP WebSocket 绕过
 - 跨域 iframe
 - VM 保护 JS
+- multipart/form-data 的边界级字段改写；此类请求必须人工处理或生成专用适配器
 
 ## 模块内部加密
 当加密函数在模块内部时，按顺序尝试：

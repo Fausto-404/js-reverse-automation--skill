@@ -49,7 +49,6 @@ def main() -> int:
             unresolved.append(candidate.get("path") or candidate.get("id"))
 
     report = {
-        "version": "2.2.0",
         "status": "quarantined" if missing or unresolved else "ready_for_validation",
         "missing_artifacts": missing,
         "unverified_candidates": [value for value in unresolved if value],

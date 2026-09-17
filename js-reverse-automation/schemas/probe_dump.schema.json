@@ -2,9 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "version": {
-      "type": "string"
-    },
     "events": {
       "type": "array",
       "items": {

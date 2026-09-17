@@ -26,7 +26,7 @@ def classify(events: list[dict], analysis: dict) -> dict:
         "event_ids": []
     }
 
-    # v2.2 adversarial runtime signals.  These are evidence of observed
+    # Adversarial runtime signals. These are evidence of observed
     # behavior, not proof that a particular vendor or challenge was identified.
     # The probe itself calls Function#toString, descriptor APIs and property
     # getters while installing hooks.  Those self-generated events must not be
@@ -126,7 +126,7 @@ def classify(events: list[dict], analysis: dict) -> dict:
         result["evidence"] = ["no_complex_indicators"]
         result["recommended_strategy"] = "runtime_hook"
 
-    # Prefer the more specific v2.2 capability when the new probe produced
+    # Prefer the more specific capability when the adversarial probe produced
     # stronger evidence than the legacy keyword classifier.
     if explicit_adversarial:
         result["type"] = "adversarial_runtime"

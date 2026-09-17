@@ -105,7 +105,7 @@ function instrument(code, options) {
   }
   let output = code;
   for (const edit of edits.slice().reverse()) output = output.slice(0, edit.start) + edit.replacement + output.slice(edit.end);
-  const bootstrap = `\n;(() => {\n  const g = globalThis;\n  if (g.__JSRA_TAPS__) g.__JSRA_TAPS__.installed = true;\n  else {\n    const state = g.__JSRA_TAPS__ = { version: "2.2.0", installed: true, events: [], max: 5000 };\n    g.__JSRA_TAP_GET__ = function(thunk, path, tag) {\n      try { const value = thunk(); state.events.push({ type: "tap_get", path, tag, value_type: typeof value, value_length: value == null ? 0 : String(value).length, timestamp: Date.now() }); if (state.events.length > state.max) state.events.shift(); return value; }\n      catch (error) { state.events.push({ type: "tap_get_err", path, tag, error: String(error), timestamp: Date.now() }); throw error; }\n    };\n  }\n})();\n`;
+  const bootstrap = `\n;(() => {\n  const g = globalThis;\n  if (g.__JSRA_TAPS__) g.__JSRA_TAPS__.installed = true;\n  else {\n    const state = g.__JSRA_TAPS__ = { probe_id: "source-tap", installed: true, events: [], max: 5000 };\n    g.__JSRA_TAP_GET__ = function(thunk, path, tag) {\n      try { const value = thunk(); state.events.push({ type: "tap_get", path, tag, value_type: typeof value, value_length: value == null ? 0 : String(value).length, timestamp: Date.now() }); if (state.events.length > state.max) state.events.shift(); return value; }\n      catch (error) { state.events.push({ type: "tap_get_err", path, tag, error: String(error), timestamp: Date.now() }); throw error; }\n    };\n  }\n})();\n`;
   return { output: bootstrap + output, edits, parser_mode: "conservative-member-read" };
 }
 
@@ -117,7 +117,6 @@ function main() {
   fs.writeFileSync(args.output, result.output, "utf8");
   const reportPath = args.report || `${args.output}.report.json`;
   fs.writeFileSync(reportPath, JSON.stringify({
-    version: "2.2.0",
     input: path.resolve(args.input),
     output: path.resolve(args.output),
     parser_mode: result.parser_mode,
