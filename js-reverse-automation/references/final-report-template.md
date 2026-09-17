@@ -50,7 +50,7 @@ curl --noproxy '*' -sS -X POST http://127.0.0.1:<flask_port>/<route> \
 #### 请求体加密
 
 - 加密接口：`http://127.0.0.1:<flask_port>/encode`。
-- 选择“请求数据包”；不要同时选择“响应数据包”。两者是互斥方向。
+- 可以同时配置加密接口和解密接口；当前测试时选择“请求数据包”，不要同时选择“响应数据包”。两者是互斥方向。
 - 原始数据包区域粘贴完整 HTTP 请求，不要只粘贴 body。
 - “处理请求头”：仅当签名或加密依赖请求头时勾选，否则不勾选。
 - “请求 base64 编码”：只有请求体进入接口前需要 Base64 编码时勾选。
@@ -59,7 +59,7 @@ curl --noproxy '*' -sS -X POST http://127.0.0.1:<flask_port>/<route> \
 
 #### 响应体解密
 
-- 解密接口：`http://127.0.0.1:<flask_port>/decode`。
+- 解密接口：`http://127.0.0.1:<flask_port>/decode`（可与加密接口同时配置）。
 - 取消选择“请求数据包”，改为选择“响应数据包”，不能同时选择两个方向。
 - 原始数据包区域粘贴完整 HTTP 响应，不要只粘贴 body。
 - “处理响应头”：仅当响应解密依赖响应头时勾选，否则不勾选。
@@ -79,7 +79,7 @@ kill $(lsof -t -i:<flask_port>)
 ### Burp autoDecoder 配置
 
 - 加密接口：`http://127.0.0.1:<flask_port>/encode`
-- 解密接口：`http://127.0.0.1:<flask_port>/decode`（无响应解密需求时留空）
+- 解密接口：`http://127.0.0.1:<flask_port>/decode`（可与加密接口同时配置）
 - HTTP 方法：`POST`
 - 表单字段：`dataBody`、`dataHeaders`
 
