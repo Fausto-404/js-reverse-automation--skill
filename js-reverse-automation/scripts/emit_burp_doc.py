@@ -61,6 +61,7 @@ def main() -> int:
 - Healthz：`http://127.0.0.1:{port}/healthz`
 - 转换接口：`http://127.0.0.1:{port}/autodecoder?direction=request`
 - 响应接口：`http://127.0.0.1:{port}/autodecoder?direction=response`
+- 如果配置端口被占用，使用 `artifacts/flask_status.json` 中实际返回的 `port`、`encode_url` 和 `decode_url`，不要继续使用默认端口。
 {transform_table}
 ## 配置原则
 
@@ -80,13 +81,14 @@ def main() -> int:
 |---|---|
 | 解密接口 | `{decode_url}`（只做请求加密时留空） |
 | 加密接口 | `{encode_url}` |
-| 数据方向 | 选择“请求数据包” |
+| 请求方向 | 选择“请求数据包”；不要同时选择“响应数据包” |
+| 响应方向 | 需要响应解密时取消“请求数据包”，改选“响应数据包”；两个方向不能同时选 |
 | 处理请求头 | 默认不选；只有签名依赖请求头时才启用 |
 | 请求 base64 编码 | 只有原始请求体本身是 Base64 时才选 |
 | 请求自动 base64 解码 | 只有服务端要求先解码 Base64 时才选 |
 | Proxy、Repeater 等模块真实调试 | 联调时可选，用于观察返回的完整数据包 |
 
-该页面选择“请求数据包”后，autoDecoder 实际通过表单字段调用接口：`dataBody` 传请求体，勾选“处理请求头”时再传 `dataHeaders`，并传 `requestorresponse=request` 或 `response`。未处理请求头时接口只返回改写后的 body；处理请求头时必须返回 `headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + body`，这是 autoDecoder 的固定返回格式。生成的 Flask 代理已兼容该协议。
+请求方向调试时，在“原始数据包”区域粘贴完整 HTTP 请求；响应方向调试时，先取消“请求数据包”，再选择“响应数据包”，并粘贴完整 HTTP 响应，不能同时选择两个方向。autoDecoder 实际通过表单字段调用接口：`dataBody` 传请求体，勾选“处理请求头”时再传 `dataHeaders`，并传 `requestorresponse=request` 或 `response`。未处理请求头时接口只返回改写后的 body；处理请求头时必须返回 `headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + body`，这是 autoDecoder 的固定返回格式。生成的 Flask 代理已兼容该协议。
 
 响应解密时，将解密接口配置为 `{decode_url}`，并选择“响应数据包”；如果没有响应解密需求，解密接口保持为空。
 

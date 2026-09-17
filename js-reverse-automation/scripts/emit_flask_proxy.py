@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +91,7 @@ def build_script(analysis: dict) -> str:
 from __future__ import annotations
 
 import json
+import os
 from collections import OrderedDict
 from urllib.parse import parse_qsl, urlencode
 
@@ -97,6 +99,7 @@ import requests
 from flask import Flask, Response, jsonify, request
 
 CONFIG = {python_literal(config)}
+CONFIG["flask_port"] = int(os.environ.get("JSRA_FLASK_PORT", CONFIG["flask_port"]))
 app = Flask(__name__)
 
 
