@@ -53,6 +53,26 @@ curl --noproxy '*' -sS -X POST http://127.0.0.1:5001/<route> \
 - “请求 base64 编码”和“请求自动 base64 解码”：只有目标协议确实使用 Base64 时勾选。
 - “Proxy、Repeater 等模块真实调试”：联调时按需勾选。
 
+### 响应体配置
+
+- 数据类型：选择“响应数据包”。
+- 解密接口：`http://127.0.0.1:5001/decode`。
+- 响应方向：传递 `requestorresponse=response`。
+- “处理响应头”：只有响应解密依赖响应头时勾选。
+- “响应 base64 编码”：只有响应体传入接口前需要 Base64 编码时勾选。
+- “响应自动 base64 解码”：只有接口返回 Base64、需要还原二进制响应时勾选。
+- 开启响应头处理时，接口必须返回 `响应头 + "\\r\\n\\r\\n\\r\\n\\r\\n" + 解密后的响应体`；否则只返回解密后的响应体。
+
+响应体验证命令：
+
+```bash
+curl --noproxy '*' -sS -X POST http://127.0.0.1:5001/decode \\
+  -H 'Content-Type: application/x-www-form-urlencoded' \\
+  --data-urlencode 'dataBody=<原始响应体>' \\
+  --data-urlencode 'dataHeaders=<可选的原始响应头>' \\
+  --data-urlencode 'requestorresponse=response'
+```
+
 ### 关闭服务命令
 
 ```bash

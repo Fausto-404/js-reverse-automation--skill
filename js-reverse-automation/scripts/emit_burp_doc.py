@@ -90,6 +90,31 @@ def main() -> int:
 
 响应解密时，将解密接口配置为 `{decode_url}`，并选择“响应数据包”；如果没有响应解密需求，解密接口保持为空。
 
+### 响应体配置
+
+| 页面字段 | 配置值 |
+|---|---|
+| 响应数据方向 | 选择“响应数据包” |
+| 解密接口 | `{decode_url}` |
+| 处理响应头 | 只有响应解密依赖响应头时才启用 |
+| 响应 base64 编码 | 只有响应体传入接口前需要 Base64 编码时才选 |
+| 响应自动 base64 解码 | 只有接口返回 Base64、需要由 autoDecoder 还原二进制响应时才选 |
+| 响应请求标识 | `requestorresponse=response` |
+
+响应方向启用请求头处理时，接口接收 `dataBody`、`dataHeaders` 和 `requestorresponse=response`，并返回 `响应头 + \\r\\n\\r\\n\\r\\n\\r\\n + 解密后的响应体`。未启用响应头处理时只返回解密后的响应体。
+
+响应体验证：
+
+```bash
+curl --noproxy '*' -sS -X POST {decode_url} \\
+  -H 'Content-Type: application/x-www-form-urlencoded' \\
+  --data-urlencode 'dataBody=<原始响应体>' \\
+  --data-urlencode 'dataHeaders=<可选的原始响应头>' \\
+  --data-urlencode 'requestorresponse=response'
+```
+
+预期结果为解密后的响应体；启用响应头处理时，返回值必须包含四组 CRLF 分隔的响应头和响应体。
+
 ### 页面配置验证（标准 autoDecoder 协议）
 
 ```bash
