@@ -1,4 +1,4 @@
-# v2.1 兼容最终报告模板
+# 最终报告模板
 
 验证通过！现在输出最终结果。
 
@@ -53,7 +53,7 @@ kill $(lsof -t -i:5001)
 - `generated/burp-autodecoder.md`
 - `artifacts/validation_report.json`
 
-### v2.2 对抗追加
+### 对抗分析追加
 
 - 对抗类型：`<anti-debug/anti-hook/environment/dynamic-load>`
 - 探针健康：`<lostPatches/reconcileErrors/dropped>`

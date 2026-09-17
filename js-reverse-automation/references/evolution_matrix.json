@@ -1,6 +1,4 @@
 {
-  "version": "2.2.0",
-  "compatibility": "v2.1-final-report-preserved",
   "iterations": [
     {"round":1,"hardening":"runtime route indirection + entrypoint wrappers","capability":"global entrypoint plus network evidence","result":"8/8"},
     {"round":2,"hardening":"character-code route reconstruction + non-enumerable resolver","capability":"dynamic route resolution","result":"8/8"},

@@ -2,13 +2,12 @@
 name: js-reverse-automation
 description: 通过 chrome-devtools-mcp 连接真实浏览器，自动定位前端加密入口，生成 JSRPC 注入代码、Flask 代理和 Burp autoDecoder 对接文档。
 metadata:
-  version: "2.2.0"
   author: Fausto-404
 ---
 
 # JS 逆向自动化
 
-v2.2 合并增强版：在 JSRPC + 真实浏览器路线基础上，增加对抗运行时探针、持久 Hook、动态代码/加载器观察、环境属性追踪、源码级保守插桩和原始/干预差分验证。
+通过 JSRPC 与真实浏览器完成前端加密入口定位、运行时取证、对抗分析、验证和工程化交付。
 
 ## 适用场景
 - 登录/注册页面密码加密
@@ -28,14 +27,14 @@ Optional Fetch Example: fetch("https://xxx/api/login", {...})
 2. 打开页面 → 注入 Hook → 触发目标动作
 3. 捕获网络请求 → 定位加密函数
 4. 注册 JSRPC → 生成 Flask/Burp 产物
-5. 验证输出 → 按 v2.1 兼容格式交付完整结果
+5. 验证输出 → 按标准最终交付格式输出完整结果
 
 遇到反调试、反 Hook、JSVMP、动态 Cookie、环境型签名或动态加载时，先生成并运行 `adversarial_runtime_probe.js`；只有观察到明确对抗信号后，才使用 `--mode intervene` 或源码级插桩。
 
 ## 详细工作流
 详见 `workflow/pipeline.md`
 
-## v2.2/v2.3 合并能力
+## 对抗与验证能力
 
 - **对抗运行时探针**：反调试、完整性检查、环境属性、动态代码、响应链、Worker/WebSocket/WASM/iframe 加载事件。
 - **持久 Hook**：页面重新赋值后自动检测丢失并尝试恢复；所有 Patch 可通过 `uninstall()` 回滚。
@@ -44,7 +43,7 @@ Optional Fetch Example: fetch("https://xxx/api/login", {...})
 - **源码级保守插桩**：针对明确选择的简单属性读取生成 tap，不默认改写全量代码。
 - **对抗差分**：比较基线与干预后的事件、请求、错误和新增证据；差分报告不等于目标已被绕过。
 - **完整交付**：标准 JSRPC 产物在调用期间捕获最终 `fetch/XHR` 网络请求，返回明文、最终 route、密文/签名请求体、HTTP 状态和业务响应；不以“发现入口”代替验证。
-- **v2.1 输出兼容**：最终结果保留分析结果、JSRPC/Flask 验证表、可复制命令、关闭命令、Burp autoDecoder 配置和生成产物；v2.2 对抗信息只能追加。
+- **完整交付**：最终结果保留分析结果、JSRPC/Flask 验证表、可复制命令、关闭命令、Burp autoDecoder 配置和生成产物；对抗信息作为补充证据追加。
 - **能力边界**：验证码、WebAuthn、设备证明、跨域隔离 Realm 和未导出的 WASM 内部函数仍需保留为人工或 unsupported 路径。
 
 ## 约束规则

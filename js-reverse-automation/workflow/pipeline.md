@@ -37,7 +37,7 @@ python3 scripts/emit_runtime_hook_probe.py --output generated/runtime_hook_probe
 - 健康检测：ok/timeout/crashed/partial
 - 降级：timeout/crashed → 静态分析
 
-## Phase 1.6: 对抗运行时探测（v2.2）
+## Phase 1.6: 对抗运行时探测
 ```bash
 python3 scripts/emit_adversarial_runtime_probe.py \
   --output generated/adversarial_runtime_probe.js \
@@ -59,7 +59,7 @@ python3 scripts/emit_module_probe.py --output generated/module_probe.js
 node scripts/ast_candidate_analyzer.js --input bundle.js --output artifacts/static_candidates.json
 ```
 
-## Phase 2.2: 源码级属性 tap（v2.2）
+## Phase 2.2: 源码级属性 tap
 ```bash
 node scripts/source_instrumentor.js \
   --input bundle.js --output generated/bundle.tap.js \
@@ -130,7 +130,7 @@ python3 scripts/validate_artifacts.py --analysis analysis_result.json --candidat
 
 ## Phase 9: 经验沉淀
 - 更新 `references/evolution_matrix.json`
-- 保留 v2.1 最终报告格式，在其中追加本轮对抗信号、探针健康和差分结论。
+- 保留标准最终报告结构，在其中追加本轮对抗信号、探针健康和差分结论。
 
 ## 入口发现失败时的处理
 1. 全局函数搜索 → React/Vue 组件 → Webpack require → 运行时 Hook
