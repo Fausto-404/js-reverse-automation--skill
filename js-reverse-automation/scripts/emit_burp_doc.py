@@ -27,6 +27,8 @@ def main() -> int:
     transforms = analysis.get("transforms") or []
     parameters = list(analysis.get("parameters", {}).keys())
     proxy_url = f"http://127.0.0.1:{port}{flask.get('route', '/autodecoder')}"
+    encode_url = f"http://127.0.0.1:{port}/encode"
+    decode_url = f"http://127.0.0.1:{port}/decode"
     jsrpc_port = analysis.get("jsrpc_server", {}).get("port", 12080)
     group = jsrpc.get("group", "jsra")
     action = jsrpc.get("action_name", "encode_password")
@@ -72,7 +74,33 @@ def main() -> int:
 
 ## Burp autoDecoder 配置
 
-### 方式一：dataBody/dataHeaders（推荐）
+### 截图所示的“接口加解密设置”页面
+
+| 页面字段 | 配置值 |
+|---|---|
+| 解密接口 | `{decode_url}`（只做请求加密时留空） |
+| 加密接口 | `{encode_url}` |
+| 数据方向 | 选择“请求数据包” |
+| 处理请求头 | 默认不选；只有签名依赖请求头时才启用 |
+| 请求 base64 编码 | 只有原始请求体本身是 Base64 时才选 |
+| 请求自动 base64 解码 | 只有服务端要求先解码 Base64 时才选 |
+| Proxy、Repeater 等模块真实调试 | 联调时可选，用于观察返回的完整数据包 |
+
+该页面选择“请求数据包”后，插件会把“请求头 + 分隔符 + 请求体”发送到加密接口，其中分隔符为 `\\r\\n\\r\\n`。生成的 Flask 代理会保留请求头，只改写请求体，再返回完整数据包。
+
+响应解密时，将解密接口配置为 `{decode_url}`，并选择“响应数据包”；如果没有响应解密需求，解密接口保持为空。
+
+### 页面配置验证
+
+```bash
+curl --noproxy '*' -sS -X POST {encode_url} \\
+  -H 'Content-Type: text/plain' \\
+  --data-binary $'POST /login HTTP/1.1\\r\\nHost: target.local\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\n\\r\\n<原始请求体>'
+```
+
+预期返回仍是完整 HTTP 数据包，首部保持不变，最后的请求体中目标字段已完成加密或签名。
+
+### 兼容方式：dataBody/dataHeaders
 
 Burp autoDecoder 插件使用 `dataBody` 和 `dataHeaders` 表单字段：
 

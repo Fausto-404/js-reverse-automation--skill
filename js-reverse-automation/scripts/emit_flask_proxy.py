@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate a Flask proxy from analysis_result.json.
+"""根据 analysis_result.json 生成 Flask 代理。
 
-Supports both v2.0 (dataBody/dataHeaders) and v2.2 (transforms-driven) modes.
-All transforms go through JSRPC — no crypto implementation in this file.
+支持 dataBody/dataHeaders 兼容模式和 transforms 驱动模式。
+所有转换都通过 JSRPC 完成，本文件不实现密码算法。
 
 Usage:
   python3 scripts/emit_flask_proxy.py --analysis analysis_result.json --output generated/flask_proxy.py
@@ -41,7 +41,7 @@ def normalize(analysis: dict) -> dict:
     jsrpc_input = dict(analysis.get("jsrpc") or {})
     default_action = jsrpc_input.get("action_name") or jsrpc_input.get("action") or "jsra_transform"
     if not transforms:
-        # v2.0 mode: build transforms from parameters
+        # 兼容模式：根据 parameters 构造 transforms
         for name, config in (analysis.get("parameters") or {}).items():
             entrypoint = config.get("entrypoint", {}) if isinstance(config, dict) else {}
             transforms.append({
@@ -286,6 +286,44 @@ def apply_body(raw: str, content_type: str, transforms: list[dict]) -> str:
     raise ValueError("Unsupported content type: " + content_type)
 
 
+def split_http_packet(raw: str) -> tuple[str, str, str] | None:
+    """Split a Burp autoDecoder raw packet into headers and body."""
+    if not raw:
+        return None
+    for separator in ("\\r\\n\\r\\n", "\\n\\n"):
+        if separator not in raw:
+            continue
+        header_block, body = raw.split(separator, 1)
+        first_line = header_block.splitlines()[0].upper() if header_block.splitlines() else ""
+        if first_line.startswith(("GET ", "POST ", "PUT ", "PATCH ", "DELETE ", "HEAD ", "OPTIONS ", "HTTP/")):
+            return header_block, separator, body
+    return None
+
+
+def packet_content_type(header_block: str) -> str:
+    for line in header_block.splitlines():
+        if line.lower().startswith("content-type:") and ":" in line:
+            return line.split(":", 1)[1].strip()
+    return "application/octet-stream"
+
+
+def rebuild_http_packet(header_block: str, separator: str, body: str) -> str:
+    """Return a raw packet with Content-Length synchronized to the new body."""
+    lines = header_block.splitlines()
+    body_length = len(body.encode("utf-8"))
+    updated = []
+    content_length_seen = False
+    for line in lines:
+        if line.lower().startswith("content-length:") and ":" in line:
+            updated.append("Content-Length: " + str(body_length))
+            content_length_seen = True
+        else:
+            updated.append(line)
+    if not content_length_seen:
+        updated.append("Content-Length: " + str(body_length))
+    return "\\r\\n".join(updated) + separator + body
+
+
 @app.get("/health")
 def health():
     return jsonify({{"status": "ok", "version": CONFIG["version"], "jsrpc": CONFIG["jsrpc"]["base_url"]}})
@@ -328,13 +366,28 @@ def autodecoder():
     else:
         raw = request.get_data(as_text=True)
         content_type = request.headers.get("X-JSRA-Content-Type", request.content_type or "application/octet-stream")
-    direction = request.args.get("direction", "request")
+    direction = request.args.get("direction")
+    if not direction:
+        direction = "response" if request.path == "/decode" else "request"
     try:
+        packet = split_http_packet(raw) if wrapped_body is None else None
+        if packet:
+            header_block, separator, body = packet
+            content_type = request.headers.get("X-JSRA-Content-Type", packet_content_type(header_block))
+            transformed = apply_body(body, content_type, body_transforms(direction))
+            return Response(rebuild_http_packet(header_block, separator, transformed), content_type="text/plain; charset=utf-8")
         return Response(apply_body(raw, content_type, body_transforms(direction)), content_type="text/plain; charset=utf-8")
     except JSRPCError as error:
         return Response("JSRA_ERROR: " + str(error), status=502, content_type="text/plain; charset=utf-8")
     except Exception as error:
         return Response("JSRA_ERROR: " + str(error), status=400, content_type="text/plain; charset=utf-8")
+
+
+# Burp autoDecoder 的“请求数据包”模式使用固定的加密/解密接口。
+# 保留 CONFIG["route"]、/autodecoder 和 dataBody/dataHeaders 以兼容旧配置。
+for alias, endpoint in (("/encode", "autodecoder_encode"), ("/decode", "autodecoder_decode"), ("/autodecoder", "autodecoder_legacy")):
+    if CONFIG["route"] != alias:
+        app.add_url_rule(alias, endpoint=endpoint, view_func=autodecoder, methods=["POST"])
 
 
 if __name__ == "__main__":
