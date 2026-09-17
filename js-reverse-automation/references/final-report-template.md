@@ -32,6 +32,17 @@ curl -sS --get \
 
 预期结果必须包含明文、最终请求体、密文/签名和最终业务响应。
 
+### Flask 代理验证
+
+```bash
+curl --noproxy '*' -sS -X POST http://127.0.0.1:5001/<route> \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'dataBody=<完整的原始 URL-encoded 请求体>' \
+  --data-urlencode 'dataHeaders=<可选的请求头 JSON>'
+```
+
+预期结果必须返回代理改写后的请求体，其中目标字段已完成加密或签名；如果配置了响应透传，还应包含最终业务响应。
+
 ### 关闭服务命令
 
 ```bash
