@@ -47,7 +47,8 @@ curl --noproxy '*' -sS -X POST http://127.0.0.1:5001/<route> \
 
 - 解密接口：`http://127.0.0.1:5001/decode`；不需要响应解密时留空。
 - 加密接口：`http://127.0.0.1:5001/encode`。
-- 数据类型：选择“请求数据包”，由插件发送 `请求头 + "\\r\\n\\r\\n" + 请求体`。
+- 数据类型：选择“请求数据包”。autoDecoder 通过 `dataBody` 发送请求体，勾选“处理请求头”时额外发送 `dataHeaders`，并传递 `requestorresponse=request/response`。
+- 开启请求头处理时，接口必须返回 `请求头 + "\\r\\n\\r\\n\\r\\n\\r\\n" + 改写后的请求体`。
 - “处理请求头”：仅当签名依赖请求头时勾选。
 - “请求 base64 编码”和“请求自动 base64 解码”：只有目标协议确实使用 Base64 时勾选。
 - “Proxy、Repeater 等模块真实调试”：联调时按需勾选。

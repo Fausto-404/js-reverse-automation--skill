@@ -355,18 +355,18 @@ def autodecoder():
     wrapped_body = request.form.get("dataBody")
     if wrapped_body is not None:
         raw = wrapped_body
-        wrapped_headers = request.form.get("dataHeaders", "")
+        wrapped_headers = request.form.get("dataHeaders")
         content_type = request.headers.get("X-JSRA-Content-Type", "")
         if not content_type:
             content_type = next((
                 line.split(":", 1)[1].strip()
-                for line in wrapped_headers.splitlines()
+                for line in (wrapped_headers or "").splitlines()
                 if line.lower().startswith("content-type:") and ":" in line
             ), "application/octet-stream")
     else:
         raw = request.get_data(as_text=True)
         content_type = request.headers.get("X-JSRA-Content-Type", request.content_type or "application/octet-stream")
-    direction = request.args.get("direction")
+    direction = request.form.get("requestorresponse") or request.args.get("direction")
     if not direction:
         direction = "response" if request.path == "/decode" else "request"
     try:
@@ -376,7 +376,11 @@ def autodecoder():
             content_type = request.headers.get("X-JSRA-Content-Type", packet_content_type(header_block))
             transformed = apply_body(body, content_type, body_transforms(direction))
             return Response(rebuild_http_packet(header_block, separator, transformed), content_type="text/plain; charset=utf-8")
-        return Response(apply_body(raw, content_type, body_transforms(direction)), content_type="text/plain; charset=utf-8")
+        transformed = apply_body(raw, content_type, body_transforms(direction))
+        if wrapped_body is not None and wrapped_headers is not None:
+            # autoDecoder expects this exact separator when header handling is enabled.
+            return Response(wrapped_headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + transformed, content_type="text/plain; charset=utf-8")
+        return Response(transformed, content_type="text/plain; charset=utf-8")
     except JSRPCError as error:
         return Response("JSRA_ERROR: " + str(error), status=502, content_type="text/plain; charset=utf-8")
     except Exception as error:

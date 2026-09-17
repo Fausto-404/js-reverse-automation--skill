@@ -86,19 +86,30 @@ def main() -> int:
 | 请求自动 base64 解码 | 只有服务端要求先解码 Base64 时才选 |
 | Proxy、Repeater 等模块真实调试 | 联调时可选，用于观察返回的完整数据包 |
 
-该页面选择“请求数据包”后，插件会把“请求头 + 分隔符 + 请求体”发送到加密接口，其中分隔符为 `\\r\\n\\r\\n`。生成的 Flask 代理会保留请求头，只改写请求体，再返回完整数据包。
+该页面选择“请求数据包”后，autoDecoder 实际通过表单字段调用接口：`dataBody` 传请求体，勾选“处理请求头”时再传 `dataHeaders`，并传 `requestorresponse=request` 或 `response`。未处理请求头时接口只返回改写后的 body；处理请求头时必须返回 `headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + body`，这是 autoDecoder 的固定返回格式。生成的 Flask 代理已兼容该协议。
 
 响应解密时，将解密接口配置为 `{decode_url}`，并选择“响应数据包”；如果没有响应解密需求，解密接口保持为空。
 
-### 页面配置验证
+### 页面配置验证（标准 autoDecoder 协议）
 
 ```bash
 curl --noproxy '*' -sS -X POST {encode_url} \\
-  -H 'Content-Type: text/plain' \\
-  --data-binary $'POST /login HTTP/1.1\\r\\nHost: target.local\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\n\\r\\n<原始请求体>'
+  -H 'Content-Type: application/x-www-form-urlencoded' \\
+  --data-urlencode 'dataBody=<原始请求体>' \\
+  --data-urlencode 'requestorresponse=request'
 ```
 
-预期返回仍是完整 HTTP 数据包，首部保持不变，最后的请求体中目标字段已完成加密或签名。
+勾选“处理请求头”时增加：
+
+```bash
+  --data-urlencode 'dataHeaders=<原始请求头>'
+```
+
+此时预期返回格式为：`原始请求头 + \\r\\n\\r\\n\\r\\n\\r\\n + 改写后的请求体`。
+
+### 完整 HTTP 数据包调试
+
+生成的 `/encode` 和 `/decode` 也支持直接提交完整 HTTP 数据包，便于脱离 Burp 页面调试；该模式会拆分请求头和请求体，并自动更新 `Content-Length`。
 
 ### 兼容方式：dataBody/dataHeaders
 
