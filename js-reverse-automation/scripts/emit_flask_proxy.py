@@ -220,6 +220,19 @@ def json_set(data: object, path: str, value: object) -> object:
     return data
 
 
+def body_value(data: object, raw: str, transform: dict) -> object:
+    """Find the plaintext for request-body transforms without hard-coding a field name."""
+    path = transform.get("path")
+    try:
+        return json_get(data, path)
+    except (KeyError, IndexError, TypeError, ValueError):
+        if isinstance(data, dict):
+            for key in ("password", "value", "data"):
+                if key in data:
+                    return data[key]
+    return raw
+
+
 def body_transforms(direction: str) -> list[dict]:
     return [t for t in CONFIG["transforms"] if t.get("direction") == direction and t.get("location") in ("body", "response")]
 
@@ -228,7 +241,7 @@ def transform_json(raw: str, transforms: list[dict]) -> str:
     data = json.loads(raw or "null", object_pairs_hook=OrderedDict)
     body_transform = next((t for t in transforms if t.get("delivery_mode") == "request_body"), None)
     if body_transform:
-        old = json_get(data, body_transform.get("path"))
+        old = body_value(data, raw, body_transform)
         call_transform = dict(body_transform)
         call_transform["context_fields"] = data
         return str(jsrpc_call(call_transform.get("action", CONFIG["jsrpc"]["action"]), old, call_transform))
@@ -244,7 +257,7 @@ def transform_form(raw: str, transforms: list[dict]) -> str:
     if body_transform:
         fields = dict(pairs)
         key = str(body_transform.get("path", "")).removeprefix("$.")
-        old = fields.get(key, raw)
+        old = fields.get(key) or fields.get("password") or fields.get("value") or fields.get("data") or raw
         call_transform = dict(body_transform)
         call_transform["context_fields"] = fields
         return str(jsrpc_call(call_transform.get("action", CONFIG["jsrpc"]["action"]), old, call_transform))
@@ -298,9 +311,24 @@ def transform_endpoint():
 
 @app.post(CONFIG["route"])
 def autodecoder():
-    raw = request.get_data(as_text=True)
+    # Accept both Burp autoDecoder's dataBody/dataHeaders wrapper and the
+    # direct-body form.  The wrapper is intentionally unwrapped before the
+    # content-type dispatch so the same transform path is exercised either way.
+    wrapped_body = request.form.get("dataBody")
+    if wrapped_body is not None:
+        raw = wrapped_body
+        wrapped_headers = request.form.get("dataHeaders", "")
+        content_type = request.headers.get("X-JSRA-Content-Type", "")
+        if not content_type:
+            content_type = next((
+                line.split(":", 1)[1].strip()
+                for line in wrapped_headers.splitlines()
+                if line.lower().startswith("content-type:") and ":" in line
+            ), "application/octet-stream")
+    else:
+        raw = request.get_data(as_text=True)
+        content_type = request.headers.get("X-JSRA-Content-Type", request.content_type or "application/octet-stream")
     direction = request.args.get("direction", "request")
-    content_type = request.headers.get("X-JSRA-Content-Type", request.content_type or "application/octet-stream")
     try:
         return Response(apply_body(raw, content_type, body_transforms(direction)), content_type="text/plain; charset=utf-8")
     except JSRPCError as error:

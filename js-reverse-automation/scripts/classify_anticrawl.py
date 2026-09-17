@@ -28,14 +28,31 @@ def classify(events: list[dict], analysis: dict) -> dict:
 
     # v2.2 adversarial runtime signals.  These are evidence of observed
     # behavior, not proof that a particular vendor or challenge was identified.
+    # The probe itself calls Function#toString, descriptor APIs and property
+    # getters while installing hooks.  Those self-generated events must not be
+    # promoted to a target anti-debug verdict.
+    self_generated = {
+        "patch.install", "probe.ready", "probe.restored",
+        "environment.watch_installed", "patch.reconciled",
+    }
     adversarial = []
+    explicit_adversarial = []
+    observation_only = []
     for event in events:
         etype = str(event.get("type", ""))
         path = str(event.get("path", ""))
-        if etype.startswith(("integrity.", "patch.lost")):
+        if etype in self_generated or etype.startswith("integrity."):
+            continue
+        if etype.startswith("patch.lost"):
             adversarial.append(("hook_integrity_check", event))
-        if etype.startswith("dynamic.") or etype.startswith("intervention."):
+            explicit_adversarial.append(("hook_integrity_check", event))
+        if etype.startswith("intervention."):
             adversarial.append(("dynamic_code", event))
+            explicit_adversarial.append(("dynamic_code", event))
+        elif etype.startswith("dynamic."):
+            # Dynamic-code hooks are useful observations, but a call to the
+            # wrapper alone is not evidence that the target is fighting us.
+            observation_only.append(("dynamic_code_observed", event))
         if etype.startswith("environment.property_read"):
             adversarial.append(("environment_property", event))
         if etype.startswith("realm.") or etype.startswith("loader."):
@@ -84,6 +101,8 @@ def classify(events: list[dict], analysis: dict) -> dict:
     adversarial_names = sorted({name for name, _ in adversarial})
     result["capabilities"] = adversarial_names
     result["event_ids"] = [str(event.get("event_id")) for _, event in adversarial[:100] if event.get("event_id")]
+    result["observation_only"] = sorted({name for name, _ in observation_only})
+    result["probe_self_events_excluded"] = True
 
     # Determine type
     if signature_indicators:
@@ -109,7 +128,7 @@ def classify(events: list[dict], analysis: dict) -> dict:
 
     # Prefer the more specific v2.2 capability when the new probe produced
     # stronger evidence than the legacy keyword classifier.
-    if "dynamic_code" in adversarial_names or "hook_integrity_check" in adversarial_names:
+    if explicit_adversarial:
         result["type"] = "adversarial_runtime"
         result["confidence"] = "high" if len(adversarial_names) >= 2 else "medium"
         result["evidence"] = sorted(set(result["evidence"] + adversarial_names))[:50]

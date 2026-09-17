@@ -243,6 +243,7 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
 
   async function invokeWithNetworkCapture(fn, thisArg, args, captureConfig = {{}}) {{
     const originalFetch = window.fetch;
+    const originalAlert = window.alert;
     const xhrPrototype = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
     const originalXhrOpen = xhrPrototype && xhrPrototype.open;
     const originalXhrSend = xhrPrototype && xhrPrototype.send;
@@ -253,6 +254,7 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
     let resolveNetwork;
     const networkSeen = new Promise(resolve => {{ resolveNetwork = resolve; }});
     let restored = false;
+    const suppressPageUi = captureConfig.suppress_page_success === true;
     const recordNetwork = record => {{
       requests.push(record);
       const expected = String(captureConfig.url_contains || captureConfig.route || "");
@@ -283,6 +285,9 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
     const restore = () => {{
       if (restored) return;
       restored = true;
+      if (suppressPageUi) {{
+        try {{ window.alert = originalAlert; }} catch (_) {{}}
+      }}
       try {{
         Object.defineProperty(window, "fetch", {{
           configurable: true, writable: true, value: originalFetch
@@ -296,6 +301,15 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
         }}
       }}
     }};
+
+    // Challenge pages commonly use alert() before redirecting on either
+    // success or failure.  A synthetic response used only to keep the page
+    // in place must not leave an external JSRPC caller blocked by a modal.
+    // Keep the suppression scoped to this invocation and restore the native
+    // function in every exit path.
+    if (suppressPageUi && typeof originalAlert === "function") {{
+      try {{ window.alert = () => {{}}; }} catch (_) {{}}
+    }}
 
     if (typeof originalFetch === "function") {{
       const captureFetch = async function (input, init = {{}}) {{
@@ -317,7 +331,7 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
           response: responseBody
         }};
         if (recordNetwork(record)) {{
-          if (captureConfig.suppress_page_success === true) {{
+          if (suppressPageUi) {{
             try {{
               return new Response(JSON.stringify({{ success: false }}), {{
                 status: response.status,
@@ -394,6 +408,12 @@ def build_script(config: dict, gate_errors: dict[str, str]) -> str:
       resultState = {{ error }};
     }}
     const network = await withTimeout(networkSeen, timeoutMs, null);
+    // The page function may return void while its fetch().then(...) chain is
+    // still pending.  Keep alert() muted through that microtask/macrotask
+    // boundary so the synthetic response cannot open a modal after capture.
+    if (suppressPageUi && network) {{
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }}
     restore();
     return {{ resultState, network: network || captured, requests }};
   }}

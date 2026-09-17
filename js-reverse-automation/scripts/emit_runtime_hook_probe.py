@@ -92,7 +92,10 @@ __HOOK_REGISTRY__
   function preview(value, key = "") {
     if (sensitive.test(key)) return "<redacted>";
     if (CONFIG.captureRaw) return safeClone(value);
-    const text = stableString(value);
+    // JSON.stringify(undefined) returns undefined.  Normalise it before
+    // measuring/slicing so an optional crypto or WebSocket argument cannot
+    // abort the entire target page.
+    const text = String(stableString(value) ?? "");
     return text.length > 96 ? text.slice(0, 96) + "…" : text;
   }
   async function record(type, detail = {}, parentEventId = null) {
@@ -154,11 +157,13 @@ __HOOK_REGISTRY__
     if (layer && !layer.duplicate) runtimeLayers.push({ target, key, id });
     return layer;
   }
-  function wrapMethod(target, key, type, name) {
+  function wrapMethod(target, key, type, name, options = {}) {
     if (!target || typeof target[key] !== "function") return;
     addRuntimeLayer(target, key, `runtime:${name}`, original => {
       const wrapped = function(...args) {
       if (registry.internalDepth > 0) return original.apply(this, args);
+      if (typeof options.skip === "function" && options.skip.call(this, args))
+        return original.apply(this, args);
       const traceId = activeTraceId || uuid("trace");
       activeTraceId = traceId;
       let result;
@@ -229,7 +234,14 @@ __HOOK_REGISTRY__
   }
 
   // === Serializer / encoding hooks ===
-  if (window.WebSocket) wrapMethod(WebSocket.prototype, "send", "network.websocket", "WebSocket.send");
+  if (window.WebSocket) wrapMethod(WebSocket.prototype, "send", "network.websocket", "WebSocket.send", {
+    skip: function() {
+      try {
+        const url = String(this && this.url || "");
+        return (CONFIG.controlWebSocketUrls || []).some(fragment => url.includes(fragment));
+      } catch (_) { return false; }
+    }
+  });
   if (window.JSON) wrapMethod(JSON, "stringify", "serializer.json", "JSON.stringify");
   if (window.URLSearchParams)
     wrapMethod(URLSearchParams.prototype, "toString", "serializer.urlsearchparams", "URLSearchParams.toString");
@@ -303,9 +315,13 @@ def main() -> int:
     parser.add_argument("--max-events", type=int, default=3000, help="Max events to keep.")
     parser.add_argument("--capture-raw", action="store_true", help="Store raw values instead of previews.")
     parser.add_argument("--params", default="", help="Comma-separated target parameter names to watch (for documentation).")
+    parser.add_argument("--control-websocket-url", action="append", default=[],
+                        help="URL fragment for a JSRPC/control WebSocket to leave untouched.")
     args = parser.parse_args()
 
-    config = {"maxEvents": max(100, args.max_events), "captureRaw": bool(args.capture_raw)}
+    control_urls = args.control_websocket_url or ["127.0.0.1:12080", "localhost:12080"]
+    config = {"maxEvents": max(100, args.max_events), "captureRaw": bool(args.capture_raw),
+              "controlWebSocketUrls": control_urls}
     # --params is retained for backward compatibility but not used in the probe
     # (the v2.2 probe watches all crypto-related activity automatically)
     if args.params:

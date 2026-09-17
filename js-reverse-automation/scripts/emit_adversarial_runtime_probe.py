@@ -158,6 +158,8 @@ __HOOK_REGISTRY__
       return selected;
     }
     return installPatch(path, target, key, original => function(...args) {
+      if (typeof options.skip === "function" && options.skip.call(this, args))
+        return original.apply(this, args);
       const recordInvocation = shouldRecord();
       const traceId = id("trace");
       if (recordInvocation)
@@ -256,7 +258,14 @@ __HOOK_REGISTRY__
     if (root.Response) {
       ["json", "text", "arrayBuffer", "blob"].forEach(key => wrap(root.Response.prototype, key, "network.response", `Response.${key}`));
     }
-    if (root.WebSocket) wrap(root.WebSocket.prototype, "send", "network.websocket", "WebSocket.send");
+    if (root.WebSocket) wrap(root.WebSocket.prototype, "send", "network.websocket", "WebSocket.send", {
+      skip: function() {
+        try {
+          const url = String(this && this.url || "");
+          return (CONFIG.controlWebSocketUrls || []).some(fragment => url.includes(fragment));
+        } catch (_) { return false; }
+      }
+    });
   }
   function observeCrypto() {
     if (!root.crypto || !root.crypto.subtle) return;
@@ -362,6 +371,8 @@ def main() -> int:
                         help="Record the first N integrity invocations in full.")
     parser.add_argument("--heal-interval-ms", type=int, default=1000)
     parser.add_argument("--properties", default="")
+    parser.add_argument("--control-websocket-url", action="append", default=[],
+                        help="URL fragment for a JSRPC/control WebSocket to leave untouched.")
     parser.add_argument("--capture-raw", action="store_true")
     parser.add_argument("--no-persistent", action="store_true")
     args = parser.parse_args()
@@ -383,6 +394,7 @@ def main() -> int:
         "properties": properties,
         "captureRaw": bool(args.capture_raw),
         "persistent": not args.no_persistent,
+        "controlWebSocketUrls": args.control_websocket_url or ["127.0.0.1:12080", "localhost:12080"],
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

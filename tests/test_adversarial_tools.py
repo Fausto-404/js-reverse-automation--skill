@@ -161,6 +161,8 @@ class AdversarialToolTests(unittest.TestCase):
             self.assertIn("bindInputFields", content)
             self.assertIn("requestBody", content)
             self.assertIn("suppress_page_success", content)
+            self.assertIn("originalAlert", content)
+            self.assertIn("suppressPageUi", content)
             self.assertEqual(subprocess.run(["node", "--check", str(output)]).returncode, 0)
 
     def test_jsrpc_captures_xhr_end_to_end(self):

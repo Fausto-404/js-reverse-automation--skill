@@ -118,3 +118,8 @@ Hlclient.prototype.sendResult = function (action, message_id, e) {
     }
     this.send(JSON.stringify({"action": action, "message_id": message_id, "response_data": e}));
 }
+
+// Explicitly publish the constructor.  DevTools evaluate_script may execute
+// this file in an isolated lexical scope; the generated JSRPC stub must still
+// be able to construct the client in a later evaluation.
+if (typeof window !== 'undefined') window.Hlclient = Hlclient;
