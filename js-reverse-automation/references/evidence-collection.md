@@ -1,296 +1,337 @@
-# Evidence Collection Rules
+# 证据收集规则
 
-This document consolidates all evidence collection methods for the js-reverse-automation skill: network capture, soft hooks, source location, and runtime hook tracing. Each section preserves the original rules, patterns, and risk notes.
-
----
-
-## 1. Network Capture
-
-### When to Use
-- Need to confirm whether the target parameter appears in URL, Header, Cookie, JSON body, or form body.
-- The page action triggers multiple similar requests; must narrow down to the one actually involved in signing or encryption.
-- User provided `Optional Fetch Example`, but need to map it to the corresponding real browser request.
-
-### Evidence Priority
-1. Network records triggered by real page actions
-2. Request details: method, URL, headers, payload, response
-3. In-page observation code output: call stacks, serialized objects, or function arguments
-4. Console logs and page state snapshots
-
-### Recommended Flow
-1. Open the target page, complete necessary interactions, ensure the request is actually sent.
-2. Use chrome-devtools-mcp network request list to filter candidate requests.
-3. Read details for each candidate request, confirm the target parameter location and request body shape.
-4. If there are many similar requests, narrow down by:
-   - Whether the target parameter appears
-   - Whether the request trigger time is close to the user action
-   - Whether the response status matches business expectations
-   - Whether the request body contains adjacent fields of unencrypted plaintext and encrypted result
-5. Once the request is locked, immediately record:
-   - Request URL
-   - HTTP method
-   - Content-Type
-   - Parameter location
-   - Key Headers
-   - Trigger action
-6. If request details alone are insufficient for source location, proceed to minimal observation code or minimal hooks.
-
-### Success Criteria
-- At least one request is explicitly marked as the target request.
-- The location of each parameter to analyze is known.
-- Request context sufficient to support subsequent source location has been recorded.
-
-### Failure Signals
-- Can only see static resource requests, not business APIs.
-- The target action triggers many highly similar requests, but cannot distinguish which one participates in signing.
-- Requests exist, but cannot confirm where the target parameter appears after which serialization layer.
-
-### Handling Strategies
-- For multi-request competition scenarios, add a single-variable experiment: change only one input value, then see which request field changes synchronously.
-- For opaque serialization scenarios, add minimal hooks to:
-  - `window.fetch`
-  - `XMLHttpRequest.prototype.open`
-  - `XMLHttpRequest.prototype.send`
-  - `JSON.stringify`
-- These observation points are injected via `evaluate_script`; if the page will refresh, use `navigate_page(initScript=...)` to pre-inject before the next navigation.
-- The purpose of hooks is only to record the "last observable form before sending", not to replace network evidence.
+本文说明 JS 逆向自动化中的证据收集方法：网络捕获、软 Hook、源码定位和运行时 Hook 跟踪，并规定证据强度、记录方式与风险控制。
 
 ---
 
-## 2. Soft Hooks (Hook Debugging Rules)
+## 1. 网络捕获
 
-### Applicable Scope
-- Network evidence has locked the target request, but entrypoint function evidence is still missing.
-- Need to confirm whether a parameter changes before and after a certain function call.
-- Need to confirm return values, `this` binding, async behavior, or global dependencies.
+### 适用场景
 
-### Minimal Hook Principles
-- Hook general boundaries first, then business functions.
-- Record first, rewrite later; by default, do not replace the original function.
-- Add only one observation point per hook; avoid multiple hooks polluting evidence together.
-- When the page is already loaded, prefer `evaluate_script` to inject observation code.
-- If the page will refresh or navigate, use `navigate_page(initScript=...)` to pre-inject before the next navigation.
+- 确认目标参数位于 URL、请求头、Cookie、JSON 请求体还是表单请求体。
+- 页面动作触发多个相似请求，需要缩小到真正参与签名或加密的请求。
+- 用户提供了 Optional Fetch Example，需要映射到真实浏览器请求。
 
-### Recommended Hook Order
-1. `window.fetch`
-2. `XMLHttpRequest.prototype.open`
-3. `XMLHttpRequest.prototype.send`
-4. `JSON.stringify`
-5. Explicitly matched business functions
-6. If necessary, supplement with `eval` / `Function` / Promise related nodes
+### 证据优先级
 
-### Each Hook Must Record At Minimum
-- Hook point path
-- Match condition
-- Input argument summary
-- Return value summary
-- Call stack summary
-- Whether it changes page behavior
-- Injection method: `evaluate_script` or `navigate_page(initScript=...)`
+1. 真实页面动作触发的网络记录。
+2. 请求详情：方法、URL、请求头、请求体和响应。
+3. 页面内观察代码输出：调用栈、序列化对象和函数参数。
+4. 控制台日志与页面状态快照。
 
-### Entrypoint Confirmation Rules
-- Business function hooks must prove at least one of the following:
-  - The plaintext input has a verifiable mapping to the target parameter in the request
-  - The function return value directly enters the request body, Header, or Cookie
-- If only internal crypto library calls are seen without caller context, it is not sufficient to认定 as the final entrypoint.
+### 推荐流程
 
-### Dependency Extraction Rules
-- Explicitly record:
-  - Where `this` binding comes from
-  - Which global objects or closure objects are depended upon
-  - Whether async waiting is needed
-  - Whether the page needs to complete a bootstrap first
-- This information must ultimately go into `artifacts/phase3_dependencies.json` and `analysis_result.json`.
+1. 打开目标页面并完成必要交互，确认请求确实发出。
+2. 使用 chrome-devtools-mcp 的网络请求列表筛选候选请求。
+3. 读取每个候选请求的详情，确认目标参数位置和请求体结构。
+4. 请求较多时，按以下条件缩小范围：
+   - 是否出现目标参数。
+   - 请求触发时间是否接近用户动作。
+   - 响应状态是否符合业务预期。
+   - 请求体是否同时包含未加密明文和加密结果等相邻字段。
+5. 锁定请求后立即记录：
+   - 请求 URL。
+   - HTTP 方法。
+   - Content-Type。
+   - 参数位置。
+   - 关键请求头。
+   - 触发动作。
+6. 请求详情不足以定位源码时，再增加最小观察代码或最小 Hook。
 
-### Risk Control
-- Do not freeze large numbers of prototypes by default.
-- Do not globally replace all crypto APIs for convenience of observation.
-- Once a hook causes a business branch change, first roll back to a smaller scope before continuing.
+### 成功标准
 
----
+- 至少一个请求被明确标记为目标请求。
+- 每个待分析参数的位置已知。
+- 已记录足以支持后续源码定位的请求上下文。
 
-## 3. Source Location
+### 失败信号
 
-### Core Principles
-- First backtrack from request details, in-page call stacks, and serialization nodes, then do keyword search.
-- First find "the last location where the parameter changed", then find "the deepest algorithm point".
-- Only accept source location results with evidence; do not accept pure text matching conclusions.
+- 只能看到静态资源请求，看不到业务 API。
+- 目标动作触发大量相似请求，无法区分签名参与者。
+- 能看到请求，但无法确认参数经过哪一层序列化后出现。
 
-### Location Priority
-1. Script clues from request details, in-page `Error().stack`, or observation-code-captured stack frames
-2. Pre-send object construction or serialization point
-3. Source code snippets with the same name as or adjacent to the parameter
-4. Crypto library call sites
+### 处理策略
 
-### Recommended Flow
-1. Start from the target request, first read request details, confirm request method, request body, and related script clues.
-2. Add minimal observation code to the request construction point:
-   - Observe `fetch` / XHR `send`
-   - Observe `JSON.stringify`
-   - Output `Error().stack` in-page
-3. If the page has refreshed or will navigate:
-   - Use `navigate_page(initScript=...)` to pre-inject observation code
-   - Re-trigger the target action and record the pre-serialization object
-4. Identify three key positions of the parameter:
-   - Plaintext entry point
-   - Processing or encryption point
-   - Final write point before sending
-5. Only when at least two of these three positions are chained by evidence can the preferred entrypoint be output.
-
-### Candidate Entrypoint Acceptance Criteria
-- Can explain the target parameter's change from plaintext to ciphertext.
-- Can locate a callable function or stable resolver.
-- Can explain `this` binding, parameter signature, and necessary dependencies.
-
-### Common Misjudgments
-- Only matched the parameter name, but the variable is just an intermediate copy.
-- Only matched `md5` / `aes` / `sha`, but it does not directly serve the target request.
-- Only saw wrapper functions, did not continue to confirm the real execution point.
-
-### Output Requirements
-- `source_hint` should尽量 land on a specific bundle location or object path.
-- `evidence` must contain at least one of:
-  - In-page call stack
-  - Hook-captured input arguments and return values
-  - Pre-serialization object snapshot
-  - Parameter value comparison experiment results
+- 多请求竞争时只改变一个输入值，观察哪个请求字段同步变化。
+- 序列化不透明时，对以下边界增加最小 Hook：
+  - window.fetch
+  - XMLHttpRequest.prototype.open
+  - XMLHttpRequest.prototype.send
+  - JSON.stringify
+- 页面会刷新时，通过 evaluate_script 注入；需要在刷新前生效时，使用 navigate_page(initScript=...) 预注入。
+- Hook 的目的只是记录“发送前最后一个可观察形态”，不能替代网络证据。
 
 ---
 
-## 4. Runtime Hook Tracing
+## 2. 软 Hook 规则
 
-### Overview
-Runtime hook tracing uses a pre-injected probe (`runtime_hook_probe.js`) to capture runtime evidence at the network, crypto, and serialization layers. It is the primary evidence source for Phase 1.5 and supplements Phase 2 entrypoint discovery.
+### 适用范围
 
-### Probe Installation
+- 网络证据已锁定目标请求，但仍缺少入口函数证据。
+- 需要确认参数在某个函数调用前后是否发生变化。
+- 需要确认返回值、this 绑定、异步行为或全局依赖。
 
-**Generation:**
-```
+### 最小 Hook 原则
+
+- 先 Hook 通用边界，再 Hook 业务函数。
+- 先记录后改写，默认不替换原函数。
+- 每个 Hook 只增加一个观察点，避免多个 Hook 同时污染证据。
+- 页面已加载时，优先使用 evaluate_script 注入。
+- 页面将刷新或导航时，使用 navigate_page(initScript=...) 预注入。
+
+### 推荐 Hook 顺序
+
+1. window.fetch
+2. XMLHttpRequest.prototype.open
+3. XMLHttpRequest.prototype.send
+4. JSON.stringify
+5. 已明确匹配的业务函数
+6. 必要时再补充 eval、Function 或 Promise 相关节点
+
+### 每个 Hook 至少记录
+
+- Hook 点路径。
+- 匹配条件。
+- 输入参数摘要。
+- 返回值摘要。
+- 调用栈摘要。
+- 是否改变页面行为。
+- 注入方式：evaluate_script 或 navigate_page(initScript=...)。
+
+### 入口确认规则
+
+业务函数 Hook 至少要证明以下一项：
+
+- 明文输入与请求中的目标参数存在可验证映射。
+- 函数返回值直接进入请求体、请求头或 Cookie。
+
+只看到密码库内部调用、没有业务调用者上下文，不能认定为最终入口。
+
+### 依赖提取规则
+
+明确记录：
+
+- this 绑定来源。
+- 依赖的全局对象或闭包对象。
+- 是否需要等待异步结果。
+- 页面是否必须先完成启动流程。
+
+这些信息最终写入 artifacts/phase3_dependencies.json 和 analysis_result.json。
+
+### 风险控制
+
+- 默认不要冻结大量原型。
+- 不要为了方便观察而全局替换所有密码学 API。
+- Hook 导致业务分支改变时，先回退到更小范围，再继续分析。
+
+---
+
+## 3. 源码定位
+
+### 核心原则
+
+- 先从请求详情、页面内调用栈和序列化节点回溯，再进行关键词搜索。
+- 先找“参数最后一次发生变化的位置”，再找“最深层算法位置”。
+- 只接受有证据支持的源码定位结果，不接受纯文本匹配结论。
+
+### 定位优先级
+
+1. 请求详情、页面内 Error().stack 或观察代码捕获的调用栈。
+2. 发送前对象构造或序列化位置。
+3. 与参数同名或相邻的源码片段。
+4. 密码库调用位置。
+
+### 推荐流程
+
+1. 从目标请求开始，确认请求方法、请求体和相关脚本线索。
+2. 在请求构造处加入最小观察代码：
+   - 观察 fetch / XHR send。
+   - 观察 JSON.stringify。
+   - 在页面内输出 Error().stack。
+3. 页面刷新或导航时：
+   - 使用 navigate_page(initScript=...) 预注入。
+   - 重新触发目标动作并记录序列化前对象。
+4. 标记参数的三个关键位置：
+   - 明文入口。
+   - 处理或加密位置。
+   - 发送前最终写入位置。
+5. 只有其中至少两个位置被证据串联后，才能输出首选入口。
+
+### 候选入口接受标准
+
+- 能解释参数从明文到密文的变化。
+- 能定位可调用函数或稳定解析器。
+- 能解释 this 绑定、参数签名和必要依赖。
+
+### 常见误判
+
+- 只匹配到参数名，但变量只是中间副本。
+- 只匹配到 md5、aes 或 sha，但它并不服务于目标请求。
+- 只看到包装函数，没有继续确认真实执行点。
+
+### 输出要求
+
+- source_hint 尽量落到具体 bundle 位置或对象路径。
+- evidence 至少包含以下一项：
+  - 页面内调用栈。
+  - Hook 捕获的输入参数和返回值。
+  - 序列化前对象快照。
+  - 参数值对照实验结果。
+
+---
+
+## 4. 运行时 Hook 跟踪
+
+### 概述
+
+运行时 Hook 使用预注入探针，在网络、密码学和序列化层捕获证据，是入口发现的重要证据源。
+
+### 探针安装
+
+生成：
+
+~~~bash
 python3 scripts/emit_runtime_hook_probe.py --output generated/runtime_hook_probe.js --params "target_param1,target_param2"
-```
+~~~
 
-**Injection:**
-- Via `evaluate_script` if the page is already loaded.
-- Via `navigate_page(initScript=...)` if the page will refresh or navigate.
+注入方式：
 
-**Idempotency:**
-- The probe checks `window.__JSRA_TRACE__` before installing; double-install is safe (no-op).
+- 页面已加载时使用 evaluate_script。
+- 页面会刷新或导航时使用 navigate_page(initScript=...)。
 
-### What the Probe Captures
+幂等性：
 
-The probe installs soft hooks on the following boundaries and records evidence into `window.__JSRA_TRACE__`:
+- 探针安装前检查 window.__JSRA_TRACE__，重复注入应安全地跳过。
 
-#### 4.1 Network Requests (`requests[]`)
-- **Hook points:** `window.fetch`, `XMLHttpRequest.prototype.open`, `XMLHttpRequest.prototype.send`
-- **Evidence per entry:**
-  - `type`: `"fetch"` or `"xhr"`
-  - `url`: request URL
-  - `method`: HTTP method
-  - `headers`: summarized request headers (for fetch)
-  - `bodySnippet`: truncated request body
-  - `timestamp`: `Date.now()`
-  - `stack`: call stack captured via `Error().stack` (up to 10 frames)
+### 探针捕获内容
 
-#### 4.2 Crypto Events (`crypto[]`)
-- **Hook points:** `crypto.subtle.digest`, `crypto.subtle.sign`, `crypto.subtle.encrypt`, `crypto.subtle.decrypt`
-- **Evidence per entry:**
-  - `type`: `"digest"`, `"sign"`, `"encrypt"`, or `"decrypt"`
-  - `algorithm`: algorithm name (string or `.name` property)
-  - `inputLen`: input byte length
-  - `outputLen`: output byte length (filled after Promise resolves)
-  - `outputHex`: first 32 hex chars of digest output (for `digest` only)
-  - `timestamp`: `Date.now()`
-  - `stack`: call stack (up to 10 frames)
+探针在以下边界安装软 Hook，并将证据写入 window.__JSRA_TRACE__。
 
-#### 4.3 Serializer Events (`serializers[]`)
-- **Hook points:** `FormData.prototype.append`, `FormData.prototype.set`, `URLSearchParams.prototype.append`, `URLSearchParams.prototype.set`, `URLSearchParams.prototype.toString`, `JSON.stringify`
-- **Evidence per entry:**
-  - `type`: serializer method name
-  - `name`: field name (for FormData/URLSearchParams)
-  - `valueSnippet` or `resultSnippet`: truncated value
-  - `keys`: object keys (for JSON.stringify, up to 20)
-  - `timestamp`: `Date.now()`
-  - `stack`: call stack (for JSON.stringify and URLSearchParams.toString)
+#### 4.1 网络请求（requests[]）
 
-#### 4.4 Selective JSON.stringify Hook
-- `JSON.stringify` is only logged when the object being serialized contains keys matching the watched parameter list (`TARGET_PARAMS` + `SENSITIVE_KEYS`).
-- `SENSITIVE_KEYS` includes: `sign`, `token`, `enc`, `password`, `signature`, `hash`, `key`, `nonce`, `timestamp`, `ts`, `data`, `encrypt`, `decrypt`.
-- This prevents log flooding from unrelated serialization calls.
+- Hook 点：window.fetch、XMLHttpRequest.prototype.open、XMLHttpRequest.prototype.send。
+- 每条记录包括：
+  - type：fetch 或 xhr。
+  - url：请求 URL。
+  - method：HTTP 方法。
+  - headers：摘要后的请求头。
+  - bodySnippet：截断后的请求体。
+  - timestamp：Date.now()。
+  - stack：通过 Error().stack 捕获的调用栈，最多 10 帧。
 
-### Evidence Retrieval
+#### 4.2 密码学事件（crypto[]）
 
-**Dump all evidence:**
-```js
+- Hook 点：crypto.subtle.digest、sign、encrypt、decrypt。
+- 每条记录包括：
+  - type：digest、sign、encrypt 或 decrypt。
+  - algorithm：算法名称。
+  - inputLen：输入字节数。
+  - outputLen：Promise 完成后的输出字节数。
+  - outputHex：摘要结果前 32 个十六进制字符，仅用于 digest。
+  - timestamp：Date.now()。
+  - stack：调用栈，最多 10 帧。
+
+#### 4.3 序列化事件（serializers[]）
+
+- Hook 点：FormData.append、FormData.set、URLSearchParams.append、URLSearchParams.set、URLSearchParams.toString、JSON.stringify。
+- 每条记录包括：
+  - type：序列化方法名。
+  - name：字段名。
+  - valueSnippet 或 resultSnippet：截断后的值。
+  - keys：JSON.stringify 对象的键，最多 20 个。
+  - timestamp：Date.now()。
+  - stack：JSON.stringify 和 URLSearchParams.toString 的调用栈。
+
+#### 4.4 选择性 JSON.stringify Hook
+
+- 只有待序列化对象包含目标参数或敏感字段时才记录。
+- 敏感字段包括 sign、token、enc、password、signature、hash、key、nonce、timestamp、ts、data、encrypt、decrypt。
+- 这样可以避免无关序列化调用造成日志洪泛。
+
+### 读取证据
+
+导出全部证据：
+
+~~~js
 evaluate_script("window.__JSRA_TRACE__.dump()")
-```
-Returns a JSON string containing `requests`, `crypto`, `serializers`, `errors`.
+~~~
 
-**Clear evidence buffer:**
-```js
+返回包含 requests、crypto、serializers、errors 的 JSON 字符串。
+
+清空证据缓存：
+
+~~~js
 evaluate_script("window.__JSRA_TRACE__.clear()")
-```
+~~~
 
-### Using Evidence for Entrypoint Discovery
+### 使用证据发现入口
 
-1. **Identify crypto entry from call stack:** In `requests[].stack`, look for frames that reference encryption/signing functions. These frames point to the business-level caller, not just the crypto library.
-2. **Cross-reference with serializer events:** If `serializers[]` shows `JSON.stringify` or `URLSearchParams.toString` being called with watched keys, the `stack` frames indicate where the request body is assembled.
-3. **Match crypto algorithm to request body:** If `crypto[]` shows a `digest` or `encrypt` event, match the `algorithm` and `outputLen` to the observed ciphertext length in the request body.
-4. **Extract caller function path:** From the stack frames, identify the outermost business function (not `fetch`, `XMLHttpRequest`, or crypto internals). This is the candidate entrypoint.
+1. 从 requests[].stack 中寻找加密或签名函数调用帧，这些帧指向业务调用者，而不仅是密码库。
+2. 与序列化事件交叉比对：如果 serializers[] 显示 JSON.stringify 或 URLSearchParams.toString 处理了关注字段，调用栈可以定位请求体组装位置。
+3. 将密码学算法和请求体对应：crypto[] 中的 digest 或 encrypt 事件，应与请求体中的密文长度和算法相匹配。
+4. 从调用栈提取最外层业务函数，排除 fetch、XMLHttpRequest 和密码库内部函数，作为候选入口。
 
-### Evidence Standards for Runtime Tracing
+### 运行时跟踪的证据标准
 
-- **Minimum evidence for `confidence=high`:** At least one `requests[]` entry with a stack that frames through a business function, plus at least one `crypto[]` or `serializers[]` entry that correlates to the target parameter.
-- **Minimum evidence for `confidence=medium`:** At least one `requests[]` entry with the target parameter visible in `bodySnippet`, even if the stack does not clearly frame the business caller.
-- **Not sufficient for `confidence=high`:** Only crypto library internal calls without business caller context.
+- 高置信度：至少一条经过业务函数的 requests[] 调用栈，以及一条与目标参数相关的 crypto[] 或 serializers[] 事件。
+- 中置信度：至少一条 bodySnippet 中出现目标参数的 requests[] 记录，即使调用栈未明确指向业务函数。
+- 仅有密码库内部调用、没有业务调用者上下文，不能达到高置信度。
 
-### Failure Handling
+### 失败处理
 
-| Symptom | Action |
+| 现象 | 处理方式 |
 |---|---|
-| Probe injection fails (anti-debug blocks it) | Record anti-debug symptom; refer to `references/antidebug/` rules; degrade to static analysis |
-| No `requests[]` entries after triggering target action | Verify the target action was actually performed; check if the probe was injected in the correct execution context |
-| `crypto[]` is empty but request body contains ciphertext | The site may use a non-Subtle crypto library (e.g., CryptoJS, JSEncrypt); use the CryptoJS/JSEncrypt hook snippets from `antidebug/dynamic-alias.md` |
-| `stack` frames are all anonymous or minified | Use the source location rules (Section 3) to correlate with bundle line numbers |
+| 探针注入失败（被反调试阻断） | 记录反调试现象，参阅反调试规则，降级到静态分析 |
+| 触发目标动作后没有 requests[] | 确认动作确实执行，并检查探针是否注入到正确执行上下文 |
+| crypto[] 为空但请求体包含密文 | 可能使用非 Subtle 密码库，使用 CryptoJS/JSEncrypt Hook 规则 |
+| stack 全部匿名或已混淆 | 使用源码定位规则，将调用栈与 bundle 行号关联 |
 
-### Risk Notes
-- The probe does not replace network evidence; it supplements it.
-- The probe hooks are soft (wrap, not replace) and should not break page functionality.
-- If a hook causes timing changes, record the hook-off baseline first, then the hook-on observation.
-- The probe does not persist across page navigations; re-inject via `initScript` if the page reloads.
+### 风险提示
+
+- 探针不能替代网络证据，只能补充网络证据。
+- 探针使用软包装，不应替换原函数或破坏页面功能。
+- Hook 造成计时变化时，先记录未启用 Hook 的基线，再记录启用后的观察结果。
+- 探针不会自动跨页面导航持久化，页面刷新后需要通过 initScript 重新注入。
 
 ---
 
-## 5. Evidence Standards (Cross-Cutting)
+## 5. 跨场景证据标准
 
-### Evidence Hierarchy
-1. **Network evidence** (request URL, method, body, headers, response) -- strongest
-2. **Runtime hook evidence** (call stacks, crypto events, serializer events) -- strong
-3. **Source code evidence** (bundle location, object path, keyword match) -- supporting only
+### 证据层级
 
-### Confidence Requirements
-| Confidence | Minimum Evidence |
+1. 网络证据：请求 URL、方法、请求体、请求头和响应，强度最高。
+2. 运行时 Hook 证据：调用栈、密码学事件和序列化事件，强度较高。
+3. 源码证据：bundle 位置、对象路径和关键词匹配，仅作为辅助。
+
+### 置信度要求
+
+| 置信度 | 最低证据 |
 |---|---|
-| `high` | Network evidence + Runtime/stack/module evidence (at least 2 types) |
-| `medium` | Single evidence source (network OR runtime) |
-| `low` | Keyword search or source code pattern only |
+| high | 网络证据 + 运行时/调用栈/模块证据，至少两类 |
+| medium | 单一证据源（网络或运行时） |
+| low | 仅有关键词搜索或源码模式 |
 
-### What Counts as Evidence
-- A `requests[]` entry from the runtime probe with a stack that frames through a business function.
-- A `crypto[]` entry that correlates algorithm and output length to the observed ciphertext.
-- A `serializers[]` entry that shows the parameter being serialized before request dispatch.
-- An `Error().stack` capture from `evaluate_script` that shows the business caller.
-- A hook-captured input/output pair that maps plaintext to ciphertext.
-- A single-variable experiment result that shows which request field changes when the input changes.
+### 可计入证据的内容
 
-### What Does NOT Count as Evidence
-- A keyword match in source code without runtime correlation.
-- A crypto library function match without business caller context.
-- A global object path that exists but was never observed to be called during the target action.
-- A suspected entrypoint without any stack, hook, or network confirmation.
+- 运行时探针产生的 requests[]，且调用栈经过业务函数。
+- 能将算法和输出长度与实际密文对应的 crypto[] 事件。
+- 显示参数在请求发送前被序列化的 serializers[] 事件。
+- evaluate_script 捕获并指向业务调用者的 Error().stack。
+- 能将明文映射到密文的 Hook 输入/输出对。
+- 只改变一个输入值后，能证明哪个请求字段随之变化的实验结果。
 
-### Recording Requirements
-Every evidence item must include:
-- Source type (network, hook, stack, serializer, crypto, experiment)
-- Timestamp or sequence indicator
-- Enough context to reproduce the observation (URL, method, hook point path, stack frames)
-- Whether the observation was made with or without patches/hooks active
+### 不可单独计入证据的内容
+
+- 没有运行时关联的源码关键词匹配。
+- 没有业务调用者上下文的密码库函数匹配。
+- 存在于全局对象上、但目标动作期间从未被观察到调用的路径。
+- 没有调用栈、Hook 或网络确认的疑似入口。
+
+### 记录要求
+
+每条证据必须包含：
+
+- 来源类型：网络、Hook、调用栈、序列化、密码学或实验。
+- 时间戳或序列号。
+- 足以复现观察的上下文：URL、方法、Hook 点路径和调用栈。
+- 观察发生时是否启用了补丁或 Hook。

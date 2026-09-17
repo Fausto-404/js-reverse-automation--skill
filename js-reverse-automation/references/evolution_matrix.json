@@ -1,26 +1,26 @@
 {
   "iterations": [
-    {"round":1,"hardening":"runtime route indirection + entrypoint wrappers","capability":"global entrypoint plus network evidence","result":"8/8"},
-    {"round":2,"hardening":"character-code route reconstruction + non-enumerable resolver","capability":"dynamic route resolution","result":"8/8"},
-    {"round":3,"hardening":"function/API integrity snapshots + anti-debug marker","capability":"integrity and external-change observation","result":"8/8"},
-    {"round":4,"hardening":"non-writable, non-configurable entrypoints","capability":"network-first fallback when entrypoint patching is blocked","result":"8/8"},
-    {"round":5,"hardening":"CryptoJS AES and JSEncrypt Proxy layers","capability":"composed crypto primitive tracing","result":"8/8"},
-    {"round":6,"hardening":"HMAC-SHA256 and DES Proxy layers","capability":"signature and legacy cipher tracing","result":"8/8"},
-    {"round":7,"hardening":"fetch Proxy layer","capability":"network hook composition","result":"8/8"},
-    {"round":8,"hardening":"webdriver/plugins/language/visibility signals","capability":"environment-signal observation without false blocking","result":"8/8"},
-    {"round":9,"hardening":"event-loop timing anomaly check","capability":"anti-step/delay signal collection","result":"8/8"},
-    {"round":10,"hardening":"source/API fingerprints + dynamic decoys","capability":"static noise plus runtime evidence retention","result":"8/8"}
+    {"round":1,"hardening":"运行时路由间接调用与入口包装","capability":"全局入口与网络证据关联","result":"8/8"},
+    {"round":2,"hardening":"字符编码路由重建与不可枚举解析器","capability":"动态路由解析","result":"8/8"},
+    {"round":3,"hardening":"函数/API 完整性快照与反调试标记","capability":"完整性与外部变化观测","result":"8/8"},
+    {"round":4,"hardening":"不可写、不可配置入口","capability":"入口补丁受阻时优先使用网络证据降级","result":"8/8"},
+    {"round":5,"hardening":"CryptoJS AES 与 JSEncrypt 代理层","capability":"组合密码学原语跟踪","result":"8/8"},
+    {"round":6,"hardening":"HMAC-SHA256 与 DES 代理层","capability":"签名与传统密码算法跟踪","result":"8/8"},
+    {"round":7,"hardening":"fetch 代理层","capability":"网络 Hook 组合","result":"8/8"},
+    {"round":8,"hardening":"webdriver、插件、语言和可见性信号","capability":"观测环境信号且避免误阻断","result":"8/8"},
+    {"round":9,"hardening":"事件循环计时异常检测","capability":"反单步与延迟信号收集","result":"8/8"},
+    {"round":10,"hardening":"源码/API 指纹与动态干扰项","capability":"保留运行时证据并隔离静态噪声","result":"8/8"}
   ],
   "delivery_regressions": [
-    {"issue":"page functions return void after fetch","fix":"generated JSRPC captures fetch request/response during invocation"},
-    {"issue":"multiple fetches before final business request","fix":"normalized exact pathname route matching"},
-    {"issue":"success navigation interrupts repeated tests","fix":"optional capture.suppress_page_success test mode"},
-    {"issue":"XHR-only pages had no final request body in JSRPC output","fix":"unified fetch/XHR capture with route matching, response parsing, and request headers"},
-    {"issue":"successful invocation left timeout timers alive","fix":"clear result/network timeout timers after Promise.race settles"}
+    {"issue":"fetch 完成后页面函数返回空值","fix":"生成的 JSRPC 在调用期间捕获 fetch 请求和响应"},
+    {"issue":"最终业务请求前存在多个 fetch","fix":"按规范化后的精确路径匹配目标路由"},
+    {"issue":"成功导航中断重复测试","fix":"提供可选的 capture.suppress_page_success 测试模式"},
+    {"issue":"仅使用 XHR 的页面在 JSRPC 输出中缺少最终请求体","fix":"统一 fetch/XHR 捕获、路由匹配、响应解析和请求头记录"},
+    {"issue":"成功调用后超时计时器仍存活","fix":"Promise.race 结束后清理结果和网络超时计时器"}
   ],
   "limits": [
-    "suppress_page_success is test-only and does not change captured server response",
-    "cryptographic protocol strength is unchanged; hardening increases reverse-analysis cost",
-    "验证码、WebAuthn、设备证明和未导出的 WASM 内部函数 remain unsupported/manual"
+    "suppress_page_success 仅用于测试，不改变捕获到的服务端响应",
+    "密码学协议强度不变；加固提升的是逆向分析成本",
+    "验证码、WebAuthn、设备证明和未导出的 WASM 内部函数仍需人工处理或标记为不支持"
   ]
 }

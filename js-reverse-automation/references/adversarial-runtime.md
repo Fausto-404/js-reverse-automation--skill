@@ -58,7 +58,7 @@ window.__JSRA_ADVERSARIAL__.uninstall()
 | `environment.*` | navigator、screen、document 等属性访问 |
 | `realm.*` | iframe、Worker、SharedWorker 创建 |
 | `loader.*` | script、WASM 等动态加载 |
-| `patch.*` | Patch 安装、丢失、重挂载和恢复 |
+| `patch.*` | 补丁安装、丢失、重挂载和恢复 |
 | `intervention.*` | 发生过的明确干预 |
 
 ## 源码级保守插桩

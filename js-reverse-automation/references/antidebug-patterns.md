@@ -1,44 +1,44 @@
-# Anti-Debug Patterns
+# 反调试与环境对抗模式
 
-This document consolidates all anti-debug, anti-detection, and environment verification patterns from the six individual antidebug rule files. Each section preserves detection signatures, patch code, evidence requirements, and risk warnings.
+本文汇总六类反调试规则中的反调试、反检测和环境校验模式。每个章节保留检测特征、补丁代码、证据要求和风险提示。
 
-**General Principle:** Verify before patch. Use the minimal patch. Record the impact. Reference `capability-boundaries.md` for what chrome-devtools-mcp can and cannot do.
+**基本原则：**先验证，再修改；使用最小补丁；记录影响范围。关于 chrome-devtools-mcp 的能力边界，参阅 `capability-boundaries.md`。
 
-**Verification Order (from anti-detection-verification.md):**
-1. Record the original phenomenon without patch.
-2. Determine the problem type: `debugger` / dynamic code construction, console cleanup or log suppression, timing or Promise timing, viewport / webdriver / UA / DevTools detection, navigation / close / history interference.
-3. Select only one minimal rule to verify.
-4. Compare before/after differences: whether requests resume, whether hooks start producing logs, whether call stacks become visible, whether the page introduces new exceptions.
+**验证顺序：**
+1. 不加补丁，先记录原始现象。
+2. 判断问题类型：`debugger`/动态代码构造、控制台清理或日志抑制、计时或 Promise 计时、视口/ webdriver / UA / DevTools 检测、导航/关闭/历史记录干扰。
+3. 每次只选择一条最小规则进行验证。
+4. 比较前后差异：请求是否恢复、Hook 是否开始产生日志、调用栈是否可见、页面是否产生新的异常。
 
-**Acceptance Criteria:**
-- After patch, new evidence usable for Phase 2-3 is produced.
-- The impact surface and residual risks of the patch can be explained.
-- The patch does not change the shape of the final JSRPC / Flask / Burp code to be generated.
+**验收标准：**
+- 补丁后产生可用于后续分析的新证据。
+- 能解释补丁的影响范围和残余风险。
+- 补丁不改变最终生成的 JSRPC / Flask / Burp 代码结构。
 
-**Prohibited Behaviors:**
-- Enabling multiple anti-debug rules simultaneously without verification.
-- Broadly faking the environment to improve "looks like it works" probability.
-- Writing debug-only patches as dependencies of the final generated artifacts.
+**禁止行为：**
+- 未验证就同时启用多条反调试规则。
+- 大范围伪造环境，只为了提高“看起来能运行”的概率。
+- 将仅用于调试的补丁写入最终生成产物的依赖。
 
 ---
 
-## 1. Debugger Loop
+## 1. Debugger 循环
 
-**Source:** `debugger-loop.md`
+**来源：** `debugger-loop.md`
 
-### Detection Signatures
-- DevTools keeps pausing before the target request is sent.
-- `eval`, `Function`, or `constructor` receives source code strings containing `debugger`.
-- The same call stack repeats and never reaches the parameter change point.
+### 检测特征
+- 目标请求发送前 DevTools 持续暂停。
+- `eval`、`Function` 或 `constructor` 收到包含 `debugger` 的源码字符串。
+- 同一调用栈反复出现，始终到不了参数变化位置。
 
-### What to Record
-- Which API triggers the problem (`eval`, `Function`, or `constructor`)
-- Source hint or call stack frame
-- Whether `toString` disguise is needed
+### 需要记录
+- 触发问题的 API（`eval`、`Function` 或 `constructor`）。
+- 源码提示或调用栈帧。
+- 是否需要伪装 `toString`。
 
-### Patch: Bypass Dynamic `debugger`
+### 补丁：绕过动态 `debugger`
 
-Applicable to: `eval`, `new Function`, `Function.prototype.constructor`, dynamically assembled code that continuously hits `debugger`.
+适用于 `eval`、`new Function`、`Function.prototype.constructor` 以及持续触发 `debugger` 的动态组装代码。
 
 ```js
 (() => {
@@ -92,31 +92,31 @@ Applicable to: `eval`, `new Function`, `Function.prototype.constructor`, dynamic
 })();
 ```
 
-### Post-Patch Verification
-- The page no longer repeatedly breaks on `debugger`.
-- `Function.prototype.toString` related checks do not trigger new exceptions.
-- The main business flow can still execute normally.
+### 补丁后验证
+- 页面不再因 `debugger` 反复中断。
+- `Function.prototype.toString` 相关检查不产生新的异常。
+- 主要业务流程仍可正常执行。
 
-### Risk
-- This rule changes global execution behavior and may trigger integrity checks. Minimize the scope of effect and record the impact surface.
+### 风险
+- 该规则会改变全局执行行为，可能触发完整性检查。应尽量缩小影响范围并记录影响面。
 
 ---
 
-## 2. Console Detection
+## 2. 控制台检测
 
-**Source:** `console-detect.md`
+**来源：** `console-detect.md`
 
-### Detection Signatures
-- `console.log`, `console.table`, or `console.clear` has been overwritten.
-- Console output disappears when the request flow is triggered.
-- Timing checks depend on console rendering side effects.
+### 检测特征
+- `console.log`、`console.table` 或 `console.clear` 被覆盖。
+- 触发请求流程后控制台输出消失。
+- 计时检测依赖控制台渲染副作用。
 
-### What to Record
-- Which console methods are affected
-- Source hint of the overwrite
-- Whether restoring console changes page behavior
+### 需要记录
+- 受影响的控制台方法。
+- 覆盖操作的源码提示。
+- 恢复控制台后页面行为是否改变。
 
-### Patch 1: Protect `console.log` / `trace` / `groupCollapsed` / `groupEnd` (Proxy method)
+### 补丁一：保护 `console.log` / `trace` / `groupCollapsed` / `groupEnd`（Proxy 方法）
 
 ```js
 (() => {
@@ -150,7 +150,7 @@ Applicable to: `eval`, `new Function`, `Function.prototype.constructor`, dynamic
 })();
 ```
 
-### Patch 2: Block `console.clear()`
+### 补丁二：阻止 `console.clear()`
 
 ```js
 (() => {
@@ -159,7 +159,7 @@ Applicable to: `eval`, `new Function`, `Function.prototype.constructor`, dynamic
 })();
 ```
 
-### Patch 3: Block `console.table()` (used for timing or getter-induction detection)
+### 补丁三：阻止 `console.table()`（用于计时或 Getter 诱导检测）
 
 ```js
 (() => {
@@ -168,33 +168,33 @@ Applicable to: `eval`, `new Function`, `Function.prototype.constructor`, dynamic
 })();
 ```
 
-### Post-Patch Verification
-- `console.log` and similar methods can still be used to observe runtime data.
-- Console output is no longer cleared or interfered with.
-- The page does not produce new exceptions due to console integrity checks.
+### 补丁后验证
+- 仍可使用 `console.log` 等方法观察运行时数据。
+- 控制台输出不再被清空或干扰。
+- 页面不会因控制台完整性检查产生新的异常。
 
-### Risk
-- Compared to execution flow hooks, console patches have lower risk, but on hardened bundles they may still trigger integrity checks.
+### 风险
+- 与执行流 Hook 相比，控制台补丁风险较低，但在加固构建中仍可能触发完整性检查。
 
 ---
 
-## 3. Timer Check
+## 3. 计时检测
 
-**Source:** `timer-check.md`
+**来源：** `timer-check.md`
 
-### Detection Signatures
-- Flow only interrupts during single-step debugging.
-- Promise callbacks or timer handlers take different branches under debugging state.
-- `performance.now`, `Date.now`, or interval delta controls whether the request is sent.
+### 检测特征
+- 只有单步调试时流程才中断。
+- 调试状态下 Promise 回调或计时器处理器进入不同分支。
+- `performance.now`、`Date.now` 或时间间隔差值决定是否发送请求。
 
-### What to Record
-- Which timing primitive is used
-- The observed threshold
-- Which branch or callback was unlocked by the bypass
+### 需要记录
+- 使用的计时原语。
+- 观测到的阈值。
+- 绕过后解锁的分支或回调。
 
-### Patch: Hook Promise Resolve
+### 补丁：Hook Promise Resolve
 
-Applicable when: you want to quickly locate async callback entry points, or need to know which Promise resolve produced the key parameter.
+适用于快速定位异步回调入口，或确认哪个 Promise resolve 产生了关键参数。
 
 ```js
 (() => {
@@ -230,34 +230,34 @@ Applicable when: you want to quickly locate async callback entry points, or need
 })();
 ```
 
-### Post-Patch Verification
-- Promise chains still execute normally.
-- Successfully see resolve parameters and call stacks.
-- No obvious performance degradation on the page.
+### 补丁后验证
+- Promise 链仍可正常执行。
+- 可以看到 resolve 参数和调用栈。
+- 页面没有明显性能下降。
 
-### Risk
-- Time normalization may mask real race conditions. It should only be used during tracing, not silently enabled by default.
+### 风险
+- 时间归一化可能掩盖真实竞态，只应在跟踪期间使用，不得默认静默启用。
 
 ---
 
-## 4. Environment Detection
+## 4. 环境检测
 
-**Source:** `env-detect.md`
+**来源：** `env-detect.md`
 
-### Detection Signatures
-- Branch logic depends on viewport size, DevTools open state, webdriver flag, UA, or extension state.
-- The same page behaves inconsistently under different browser configurations.
-- After opening DevTools, the request chain disappears.
+### 检测特征
+- 分支逻辑依赖视口尺寸、DevTools 打开状态、webdriver 标志、UA 或扩展状态。
+- 同一页面在不同浏览器配置下表现不一致。
+- 打开 DevTools 后请求链消失。
 
-### What to Record
-- The property being checked
-- Original value
-- Replacement value
-- Affected source code hint
+### 需要记录
+- 被检查的属性。
+- 原始值。
+- 替换值。
+- 受影响的源码提示。
 
-### Patch: Fix Window Dimensions
+### 补丁：修正窗口尺寸
 
-Applicable when: the site uses `innerHeight` / `innerWidth` or `outerHeight` / `outerWidth` to detect whether DevTools is open.
+适用于网站使用 `innerHeight` / `innerWidth` 或 `outerHeight` / `outerWidth` 判断 DevTools 是否打开的场景。
 
 ```js
 (() => {
@@ -295,30 +295,30 @@ Applicable when: the site uses `innerHeight` / `innerWidth` or `outerHeight` / `
 })();
 ```
 
-### Post-Patch Verification
-- After opening DevTools, size detection is no longer triggered.
-- Page layout does not have unacceptable distortion.
+### 补丁后验证
+- 打开 DevTools 后不再触发尺寸检测。
+- 页面布局没有不可接受的变形。
 
-### Risk
-- Environment spoofing may distort judgment of production behavior. Should only be used for investigation and explicitly recorded.
+### 风险
+- 环境伪造可能影响对正式环境行为的判断，只能用于调查，并且必须明确记录。
 
 ---
 
-## 5. Proxy Guard
+## 5. 代理与导航保护
 
-**Source:** `proxy-guard.md`
+**来源：** `proxy-guard.md`
 
-### Detection Signatures
-- `window.close`, `history.back`, redirect hook, or unload handler interrupts the tracing flow.
-- Requests fail only after configuring a proxy.
-- After page navigation, extension or injected scripts are blocked.
+### 检测特征
+- `window.close`、`history.back`、重定向 Hook 或卸载处理器中断跟踪流程。
+- 只有配置代理后请求才失败。
+- 页面导航后扩展或注入脚本被阻止。
 
-### What to Record
-- Guard type (`close`, `history`, `redirect`, `proxy`, `extension`)
-- Source hint
-- Whether request replay succeeds after handling
+### 需要记录
+- 保护类型（`close`、`history`、`redirect`、`proxy`、`extension`）。
+- 源码提示。
+- 处理后请求重放是否成功。
 
-### Patch 1: Block `window.close`
+### 补丁一：阻止 `window.close`
 
 ```js
 (() => {
@@ -327,7 +327,7 @@ Applicable when: the site uses `innerHeight` / `innerWidth` or `outerHeight` / `
 })();
 ```
 
-### Patch 2: Block `history.go` / `history.back`
+### 补丁二：阻止 `history.go` / `history.back`
 
 ```js
 (() => {
@@ -337,9 +337,9 @@ Applicable when: the site uses `innerHeight` / `innerWidth` or `outerHeight` / `
 })();
 ```
 
-### Patch 3: Break Before Navigation (for locating the source)
+### 补丁三：导航前断点（用于定位源码）
 
-Applicable when: the page is about to navigate and you need to locate the source code at the moment of navigation.
+适用于页面即将导航，需要定位导航发生瞬间源码的场景。
 
 ```js
 (() => {
@@ -352,38 +352,38 @@ Applicable when: the page is about to navigate and you need to locate the source
 })();
 ```
 
-### Post-Patch Verification
-- The page is no longer forcibly closed or navigated back.
-- Before navigation, the breakpoint can be stably hit.
-- These patches are removed promptly after debugging.
+### 补丁后验证
+- 页面不再被强制关闭或返回上一页。
+- 导航前可以稳定命中断点。
+- 调试结束后及时移除这些补丁。
 
-### Risk
-- Navigation guard patches may change page state. When conditions allow, re-verify the request chain after removing the patch.
+### 风险
+- 导航保护补丁可能改变页面状态。条件允许时，应移除补丁后重新验证请求链。
 
 ---
 
-## 6. Dynamic Alias (Crypto Library Hooks)
+## 6. 动态别名（密码库 Hook）
 
-**Source:** `dynamic-alias.md`
+**来源：** `dynamic-alias.md`
 
-### Detection Signatures
-- Request parameters have changed, but no stable global path is visible.
-- Multiple layers of wrapper functions delegate layer by layer to the real crypto or signing function.
-- Missing source map, and object paths change after every refresh.
+### 检测特征
+- 请求参数发生变化，但看不到稳定的全局路径。
+- 多层包装函数逐层转发到真正的加密或签名函数。
+- 缺少 source map，且对象路径每次刷新都会变化。
 
-### Strategy
-- When stability is low, prefer the resolver strategy over hardcoding object paths.
-- Record the wrapper chain and the minimal runtime preconditions needed to resolve to a callable function.
-- Record whether the generated JSRPC uses a resolver rather than a static path.
+### 策略
+- 稳定性较低时，优先使用解析器策略，不要硬编码对象路径。
+- 记录包装链，以及解析到可调用函数所需的最小运行时前置条件。
+- 记录生成的 JSRPC 使用的是解析器还是静态路径。
 
-### What to Record
-- Wrapper chain
-- Resolver trigger conditions
-- Runtime dependencies needed before resolution
+### 需要记录
+- 包装链。
+- 解析器触发条件。
+- 解析前需要满足的运行时依赖。
 
-### Patch 1: Hook CryptoJS
+### 补丁一：Hook CryptoJS
 
-Applicable when: the target site uses CryptoJS and you need to quickly locate the parameter source for AES / DES / MD5 / SHA / HMAC.
+适用于目标网站使用 CryptoJS，需要快速定位 AES / DES / MD5 / SHA / HMAC 参数来源的场景。
 
 ```js
 (() => {
@@ -430,7 +430,7 @@ Applicable when: the target site uses CryptoJS and you need to quickly locate th
 
   const tempApply = Function.prototype.apply;
   Function.prototype.apply = function () {
-    // === Symmetric Encryption Detection ===
+    // === 对称加密检测 ===
     if (
       arguments.length === 2 &&
       arguments[0] &&
@@ -491,7 +491,7 @@ Applicable when: the target site uses CryptoJS and you need to quickly locate th
         }
       }
     }
-    // === Symmetric Decryption Detection ===
+    // === 对称解密检测 ===
     else if (
       arguments.length === 2 &&
       arguments[0] &&
@@ -536,7 +536,7 @@ Applicable when: the target site uses CryptoJS and you need to quickly locate th
         }
       }
     }
-    // === Hash/HMAC Detection ===
+    // === 哈希/HMAC 检测 ===
     else if (
       arguments.length === 2 &&
       arguments[0] &&
@@ -573,9 +573,9 @@ Applicable when: the target site uses CryptoJS and you need to quickly locate th
 })();
 ```
 
-### Patch 2: Hook JSEncrypt RSA
+### 补丁二：Hook JSEncrypt RSA
 
-Applicable when: the target site uses JSEncrypt and you want to directly obtain the RSA public key, private key, plaintext, and ciphertext.
+适用于目标网站使用 JSEncrypt，需要直接获取 RSA 公钥、私钥、明文和密文的场景。
 
 ```js
 (() => {
@@ -663,25 +663,25 @@ Applicable when: the target site uses JSEncrypt and you want to directly obtain 
 })();
 ```
 
-### Post-Patch Verification
-- Successfully prints key parameters from the crypto wrapper chain.
-- Can locate the real CryptoJS or JSEncrypt call site.
-- Page functionality is not broken by rewriting the underlying `call`/`apply`.
+### 补丁后验证
+- 成功从密码学包装链输出关键参数。
+- 可以定位真实的 CryptoJS 或 JSEncrypt 调用位置。
+- 重写底层 `call`/`apply` 后页面功能没有损坏。
 
-### Risk
-- Rewriting `call`/`apply` affects the global scope and may trigger integrity checks on hardened bundles.
+### 风险
+- 重写 `call`/`apply` 会影响全局作用域，可能触发加固构建的完整性检查。
 
 ---
 
-## 7. Quick Reference: When to Use Each Pattern
+## 7. 模式快速选择
 
-| Pattern | Symptom | File |
+| 模式 | 现象 | 文件 |
 |---|---|---|
-| Debugger Loop | Repeated `debugger`, `eval`/`Function`/`constructor` tampering | `debugger-loop.md` |
-| Console Detection | Console method overwrite, `console.clear`, `console.table`, log suppression | `console-detect.md` |
-| Timer Check | Timing delta checks, Promise timing, performance probes | `timer-check.md` |
-| Environment Detection | Viewport size, devtools, webdriver, UA checks | `env-detect.md` |
-| Proxy Guard | Navigation, close, history, redirect hook blocking request replay | `proxy-guard.md` |
-| Dynamic Alias | Obfuscated aliases, dynamic resolvers, crypto wrappers, async indirection | `dynamic-alias.md` |
+| Debugger 循环 | 反复出现 `debugger`，或 `eval`/`Function`/`constructor` 被篡改 | `debugger-loop.md` |
+| 控制台检测 | 控制台方法被覆盖、调用 `console.clear`/`console.table`、日志被抑制 | `console-detect.md` |
+| 计时检测 | 计时差值检查、Promise 计时、性能探针 | `timer-check.md` |
+| 环境检测 | 视口尺寸、DevTools、webdriver、UA 检查 | `env-detect.md` |
+| 代理与导航保护 | 导航、关闭、历史记录、重定向 Hook 阻止请求重放 | `proxy-guard.md` |
+| 动态别名 | 混淆别名、动态解析器、密码学包装、异步间接调用 | `dynamic-alias.md` |
 
-Only reference a rule when it genuinely changes the investigation path or risk surface.
+只有在某条规则确实改变调查路径或风险面时，才引用并启用它。

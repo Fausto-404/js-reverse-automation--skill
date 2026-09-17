@@ -11,7 +11,7 @@
 - 加密函数：`<函数路径>`
 - 加密方式：`<算法/编码/组合>`
 - 入口路径：`<页面入口或运行时路径>`
-- 置信度：`High`（网络请求 + 运行时 Hook 双重验证）
+- 置信度：`高`（网络请求 + 运行时 Hook 双重验证）
 
 ### 验证结果
 
@@ -42,8 +42,8 @@ kill $(lsof -t -i:5001)
 ### Burp autoDecoder 配置
 
 - autoDecoder URL：`http://127.0.0.1:5001/<route>`
-- HTTP Method：`POST`
-- Form Fields：`dataBody`、`dataHeaders`
+- HTTP 方法：`POST`
+- 表单字段：`dataBody`、`dataHeaders`
 
 ### 生成的产物
 
@@ -55,6 +55,6 @@ kill $(lsof -t -i:5001)
 
 ### 对抗分析追加
 
-- 对抗类型：`<anti-debug/anti-hook/environment/dynamic-load>`
-- 探针健康：`<lostPatches/reconcileErrors/dropped>`
-- 差分结论：`<observation/intervention result>`
+- 对抗类型：`<反调试/反 Hook/环境检测/动态加载>`
+- 探针健康：`<丢失补丁/重建错误/丢弃事件>`
+- 差分结论：`<观察结果/干预结果>`
