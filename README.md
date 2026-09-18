@@ -196,13 +196,6 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - autoDecoder：https://github.com/f0ng/autoDecoder 
 - chrome-devtools-mcp：https://github.com/ChromeDevTools/chrome-devtools-mcp/ 
 
-## 能力概览
-
-- 证据驱动的运行时 Hook、请求字段关联和候选差分验证
-- 反调试、完整性、环境属性、动态代码、多 Realm 和加载器观测
-- JSVMP 场景的保守源码属性 tap 与运行时热点关联
-- JSRPC、Flask 和 Burp autoDecoder 的完整交付链路
-- 端口占用自动回退、状态文件身份校验和失败关闭保护
 ## 更新日志
 
 ### v2.2（2026-09-18）
