@@ -6,19 +6,19 @@
 
 <p align="center">
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/releases">
-    <img src="https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill-test?style=flat-square&label=release&color=blue&cacheSeconds=3600" alt="Release">
+    <img src="https://img.shields.io/github/v/release/Fausto-404/js-reverse-automation--skill?style=flat-square&label=release&color=blue&cacheSeconds=3600" alt="Release">
   </a>
 
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/stargazers">
-    <img src="https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill-test?style=flat-square&label=stars&color=brightgreen&cacheSeconds=3600" alt="GitHub Stars">
+    <img src="https://img.shields.io/github/stars/Fausto-404/js-reverse-automation--skill?style=flat-square&label=stars&color=brightgreen&cacheSeconds=3600" alt="GitHub Stars">
   </a>
 
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/network/members">
-    <img src="https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill-test?style=flat-square&label=forks&color=orange&cacheSeconds=3600" alt="GitHub Forks">
+    <img src="https://img.shields.io/github/forks/Fausto-404/js-reverse-automation--skill?style=flat-square&label=forks&color=orange&cacheSeconds=3600" alt="GitHub Forks">
   </a>
 
   <a href="https://github.com/Fausto-404/js-reverse-automation--skill-test/releases">
-    <img src="https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill-test/total?style=flat-square&label=downloads&color=success&cacheSeconds=3600" alt="Downloads">
+    <img src="https://img.shields.io/github/downloads/Fausto-404/js-reverse-automation--skill/total?style=flat-square&label=downloads&color=success&cacheSeconds=3600" alt="Downloads">
   </a>
 </p>
 
