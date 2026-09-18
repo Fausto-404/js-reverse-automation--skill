@@ -73,6 +73,9 @@
 - 对抗运行时探针：反调试、反 Hook、动态代码、环境属性、响应链和加载器事件
 - 源码级保守插桩：针对 JSVMP/混淆代码的属性读取 tap 与热点分析
 - 持久 Hook 与差分：检测 Hook 丢失、恢复观测能力，并比较基线/干预行为
+- 浏览器会话契约：绑定 tab/document 身份，区分断线、超时、暂停、导航后的未知状态，避免只凭端口或注册日志误报成功
+- 控制流观测：按需记录控制台清理、历史导航、存储访问和关闭页面等干扰信号，并支持可回滚的受控干预
+- action 证据验收：使用 `validate_browser_evidence.py` 检查明文、最终请求体、路由、HTTP 状态和业务响应是否齐全
 
 ## 项目结构
 ```latex
@@ -88,6 +91,7 @@ js-reverse-automation/
 │   ├── architecture.md               # 架构说明
 │   ├── security-model.md             # 安全模型
 │   ├── antidebug-patterns.md         # 反调试模式与 Patch
+│   ├── browser-session-contract.md   # 浏览器会话与证据契约
 │   ├── advanced-entrypoints.md       # 复杂入口场景（Webpack/异步/WASM）
 │   ├── evidence-collection.md        # 取证方法（Hook/源码/网络）
 │   └── evolution_matrix.json         # 跨任务经验记忆库
@@ -112,6 +116,7 @@ js-reverse-automation/
 │   ├── emit_burp_doc.py              # Burp 文档生成
 │   ├── manage_services.py            # 服务管理（JSRPC/Flask 启停）
 │   ├── validate_artifacts.py         # 四层校验
+│   ├── validate_browser_evidence.py # action 级浏览器/JSRPC 证据校验
 │   ├── quarantine.py                 # 隔离报告
 │   ├── doctor.py                     # 依赖检查
 │   ├── env_patcher.py                # 环境补丁
@@ -134,7 +139,8 @@ js-reverse-automation/
     ├── validation_report.json        # 四层校验报告
     ├── quarantine.json               # 隔离报告
     ├── jsrpc_status.json             # JSRPC 服务状态
-    └── flask_status.json             # Flask 服务状态
+    ├── flask_status.json             # Flask 服务状态
+    └── browser_evidence.json         # action 级真实调用证据验收
 ```
 
 ## 使用示意

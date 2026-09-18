@@ -165,6 +165,7 @@ def _validate_result(value: object, input_value: object, transform: dict) -> obj
 def jsrpc_call(action: str, value: object, transform: dict) -> object:
     cfg = CONFIG["jsrpc"]
     base = str(cfg["base_url"]).rstrip("/")
+    endpoint = base if base.endswith("/go") else base + "/go"
     timeout = float(cfg.get("timeout_seconds", 10))
     context = {{"transform_id": transform.get("id"), "candidate_path": transform.get("candidate_path")}}
     if transform.get("context_fields") is not None:
@@ -172,9 +173,9 @@ def jsrpc_call(action: str, value: object, transform: dict) -> object:
     param = json.dumps({{"parameter": transform.get("id"), "value": value, "context": context}}, ensure_ascii=False)
     try:
         if cfg.get("transport") == "post_json":
-            response = requests.post(base + "/go", json={{"group": cfg["group"], "action": action, "param": param}}, timeout=timeout)
+            response = requests.post(endpoint, json={{"group": cfg["group"], "action": action, "param": param}}, timeout=timeout)
         else:
-            response = requests.get(base + "/go", params={{"group": cfg["group"], "action": action, "param": param}}, timeout=timeout)
+            response = requests.get(endpoint, params={{"group": cfg["group"], "action": action, "param": param}}, timeout=timeout)
         response.raise_for_status()
         try:
             payload = response.json()
@@ -335,6 +336,17 @@ def transform_form(raw: str, transforms: list[dict]) -> str:
 def apply_body(raw: str, content_type: str, transforms: list[dict]) -> str:
     if not transforms:
         return raw
+    # Burp autoDecoder sends a complete packet as application/octet-stream
+    # when the request/response packet radio is selected. Infer the body
+    # format when the wrapper omits the original Content-Type.
+    inferred_content_type = content_type or ""
+    if "octet-stream" in inferred_content_type.lower():
+        stripped = raw.lstrip()
+        if stripped.startswith(("{{", "[")):
+            inferred_content_type = "application/json"
+        elif "=" in raw and not stripped.startswith(("GET ", "POST ", "PUT ", "PATCH ", "DELETE ", "HEAD ", "OPTIONS ", "HTTP/")):
+            inferred_content_type = "application/x-www-form-urlencoded"
+    content_type = inferred_content_type
     mode = transforms[0].get("content_type", "auto")
     if mode == "json" or (mode == "auto" and "json" in content_type.lower()):
         return transform_json(raw, transforms)
@@ -367,13 +379,17 @@ def split_http_packet(raw: str) -> tuple[str, str, str] | None:
     """Split a Burp autoDecoder raw packet into headers and body."""
     if not raw:
         return None
-    for separator in ("\\r\\n\\r\\n", "\\n\\n"):
-        if separator not in raw:
-            continue
-        header_block, body = raw.split(separator, 1)
-        first_line = header_block.splitlines()[0].upper() if header_block.splitlines() else ""
-        if first_line.startswith(("GET ", "POST ", "PUT ", "PATCH ", "DELETE ", "HEAD ", "OPTIONS ", "HTTP/")):
-            return header_block, separator, body
+    candidates = [raw.lstrip("\\ufeff")]
+    if "\\\\r\\\\n" in raw:
+        candidates.append(raw.replace("\\\\r\\\\n", "\\r\\n").replace("\\\\n", "\\n"))
+    for candidate in candidates:
+        for separator in ("\\r\\n\\r\\n\\r\\n\\r\\n", "\\n\\n\\n\\n", "\\r\\n\\r\\n", "\\n\\n"):
+            if separator not in candidate:
+                continue
+            header_block, body = candidate.split(separator, 1)
+            first_line = header_block.splitlines()[0].strip().upper() if header_block.splitlines() else ""
+            if first_line.startswith(("GET ", "POST ", "PUT ", "PATCH ", "DELETE ", "HEAD ", "OPTIONS ", "HTTP/")):
+                return header_block, separator, body
     return None
 
 

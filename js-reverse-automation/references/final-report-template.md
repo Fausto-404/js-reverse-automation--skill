@@ -32,6 +32,16 @@ curl -sS --get \
 
 预期结果必须包含明文、最终请求体、密文/签名和最终业务响应。
 
+将上述真实返回保存为 `artifacts/jsrpc_smoke.json` 后，必须执行：
+
+```bash
+python3 scripts/validate_browser_evidence.py \
+  --input artifacts/jsrpc_smoke.json \
+  --output artifacts/browser_evidence.json
+```
+
+只有 `browser_evidence.json` 中 `passed=true` 时，才能在报告中写“验证通过”。如果保存了桥接连接、`tabId` 和 `documentId`，追加 `--require-session`。
+
 ### Flask 代理验证
 
 ```bash
@@ -42,6 +52,16 @@ curl --noproxy '*' -sS -X POST http://127.0.0.1:<flask_port>/<route> \
 ```
 
 预期结果必须返回代理改写后的请求体，其中目标字段已完成加密或签名；如果配置了响应透传，还应包含最终业务响应。
+
+Burp“请求数据包/响应数据包”整包模式还必须单独验证：
+
+```bash
+curl --noproxy '*' -sS -X POST http://127.0.0.1:<flask_port>/encode \
+  -H 'Content-Type: application/octet-stream' \
+  --data-binary $'POST /path HTTP/1.1\\r\\nHost: target\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\n\\r\\npassword=plaintext'
+```
+
+预期返回完整 HTTP 报文，目标字段已替换且 `Content-Length` 已同步。外层 `application/octet-stream` 不代表目标 body 是二进制；代理必须识别内层 HTTP 报文的 Content-Type。
 
 ### Burp autoDecoder 页面配置
 
@@ -82,6 +102,8 @@ kill $(lsof -t -i:<flask_port>)
 - 解密接口：`http://127.0.0.1:<flask_port>/decode`（可与加密接口同时配置）
 - HTTP 方法：`POST`
 - 表单字段：`dataBody`、`dataHeaders`
+- 生成后必须通过 `python3 scripts/check_delivery_contract.py --proxy generated/flask_proxy.py --output artifacts/delivery_contract.json`。
+- `jsrpc.base_url` 无论配置为 `http://127.0.0.1:12080` 还是带 `/go` 的完整地址，最终请求只能包含一次 `/go`。
 
 ### 生成的产物
 
@@ -90,6 +112,7 @@ kill $(lsof -t -i:<flask_port>)
 - `generated/flask_proxy.py`
 - `generated/burp-autodecoder.md`
 - `artifacts/validation_report.json`
+- `artifacts/browser_evidence.json`
 
 ### 对抗分析追加
 

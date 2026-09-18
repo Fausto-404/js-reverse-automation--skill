@@ -299,6 +299,50 @@ __HOOK_REGISTRY__
       observer.observe(root.document.documentElement || root.document, { childList: true, subtree: true });
     }
   }
+  function observeControlFlow() {
+    if (!CONFIG.controlFlow) return;
+    if (root.console) {
+      ["clear", "table"].forEach(key => {
+        if (typeof root.console[key] === "function")
+          wrap(root.console, key, "control.console", `console.${key}`, { sampleEvery: 1, eventBudget: 64 });
+      });
+    }
+    if (root.history) {
+      ["pushState", "replaceState", "back", "forward", "go"].forEach(key => {
+        if (typeof root.history[key] !== "function") return;
+        installPatch(`history.${key}`, root.history, key, original => function(...args) {
+          const blocked = CONFIG.mode === "intervene" && ["back", "forward", "go"].includes(key);
+          emit(blocked ? "intervention.history_blocked" : "control.history.call", {
+            path: `history.${key}`, input: args[0], metadata: { argc: args.length, blocked }
+          });
+          if (blocked) return undefined;
+          return original.apply(this, args);
+        });
+      });
+    }
+    if (root.Storage && root.Storage.prototype) {
+      ["getItem", "setItem", "removeItem", "clear"].forEach(key => {
+        if (typeof root.Storage.prototype[key] !== "function") return;
+        wrap(root.Storage.prototype, key, "control.storage", `Storage.${key}`, {
+          sampleEvery: 1,
+          eventBudget: 128,
+          skip: function(args) {
+            return key !== "clear" && typeof args[0] === "string" && !KEYWORDS.test(args[0]);
+          }
+        });
+      });
+    }
+    if (typeof root.close === "function") {
+      installPatch("window.close", root, "close", original => function(...args) {
+        const blocked = CONFIG.mode === "intervene";
+        emit(blocked ? "intervention.close_blocked" : "control.close.call", {
+          path: "window.close", metadata: { argc: args.length, blocked }
+        });
+        if (blocked) return undefined;
+        return original.apply(this, args);
+      });
+    }
+  }
   function observeIntegrity() {
     const options = {
       eventBudget: CONFIG.integrityEventBudget,
@@ -316,6 +360,7 @@ __HOOK_REGISTRY__
     watchProperties();
     observeDynamicCode();
     observeNetwork();
+    observeControlFlow();
     observeCrypto();
     observeLoaders();
     observeIntegrity();
@@ -372,6 +417,8 @@ def main() -> int:
     parser.add_argument("--properties", default="")
     parser.add_argument("--control-websocket-url", action="append", default=[],
                         help="URL fragment for a JSRPC/control WebSocket to leave untouched.")
+    parser.add_argument("--no-control-flow", action="store_true",
+                        help="Skip console/history/storage/window.close observation.")
     parser.add_argument("--capture-raw", action="store_true")
     parser.add_argument("--no-persistent", action="store_true")
     args = parser.parse_args()
@@ -394,6 +441,7 @@ def main() -> int:
         "captureRaw": bool(args.capture_raw),
         "persistent": not args.no_persistent,
         "controlWebSocketUrls": args.control_websocket_url or ["127.0.0.1:12080", "localhost:12080"],
+        "controlFlow": not args.no_control_flow,
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

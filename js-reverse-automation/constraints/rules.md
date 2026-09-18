@@ -8,6 +8,10 @@
 5. 主动调用候选前必须检查 `safe_to_invoke`
 6. JSRPC 只负责调用页面真实函数，禁止重写加密算法
 7. 没有真实入口和请求字段关联时，不得生成可用于 Burp 的成功转换
+8. 生成器中的 JSRPC 地址必须归一化，禁止产生 `/go/go`；完整报文和 wrapper 两种 Burp 输入必须都有回归测试
+9. 仅凭 12080 端口、Flask `/healthz` 或页面出现“已注册”不得判定交付成功，必须完成 action 级实时调用
+10. 浏览器断线、超时、暂停、导航或文档身份变化后，旧 tab/document/元素引用和旧 action 结果全部失效；必须重新绑定并重新验证，不能盲目重放非幂等动作
+11. 最终报告必须能回溯到 `artifacts/browser_evidence.json`；缺少明文、最终请求体、route、HTTP 状态或业务响应任一项时，只能报告为未确认
 
 ## 能力边界
 - **能做**：页面导航、evaluate_script、initScript 预注入、Hook fetch/XHR/crypto/WebSocket/库、Webpack 模块捕获、证据驱动候选发现、差分验证

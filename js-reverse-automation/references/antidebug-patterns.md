@@ -529,7 +529,7 @@
             console.log('Decrypt block mode:', arguments[1][2].mode.Encryptor.processBlock);
           }
           if (time === 0) {
-            console.log('Fuzz crypto algorithms script: https://github.com/0xsdeo/Fuzz_Crypto_Algorithms');
+            console.log('如需继续确认算法类型，请结合当前页面的实际调用参数和输出长度进行定向验证。');
             time += 1;
           }
           console.log('%c---------------------------------------------------------------------', 'color: green;');

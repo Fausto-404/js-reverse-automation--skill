@@ -38,6 +38,7 @@ python3 scripts/identify_crypto.py --output-sample "<加密后的密码>"
 
 ## Phase 1: 浏览器连接
 - 打开目标页面
+- 读取浏览器连接状态并锁定当前 `tabId`、URL 和文档身份；断线、刷新、跨文档导航后重新绑定，不复用旧元素引用或旧调用栈。
 - 通过 `navigate_page(initScript=...)` 预注入 Hook
 - 记录 URL/Method/Body/Headers/参数落点
 
@@ -107,6 +108,9 @@ python3 scripts/differential_verifier.py apply --candidates artifacts/encryption
 ```bash
 python3 scripts/emit_jsrpc_stub.py --analysis analysis_result.json --candidates artifacts/encryption_candidates.verified.json --output generated/jsrpc_inject.js
 python3 scripts/emit_flask_proxy.py --analysis analysis_result.json --output generated/flask_proxy.py
+python3 scripts/check_delivery_contract.py \
+  --proxy generated/flask_proxy.py \
+  --output artifacts/delivery_contract.json
 python3 scripts/manage_services.py --service jsrpc --analysis analysis_result.json --output artifacts/jsrpc_status.json --action start --force
 python3 scripts/manage_services.py --service flask --analysis analysis_result.json --flask-file generated/flask_proxy.py --output artifacts/flask_status.json --action start --force
 ```
@@ -114,8 +118,10 @@ python3 scripts/manage_services.py --service flask --analysis analysis_result.js
 ## Phase 6: 注入浏览器
 - 通过 Chrome DevTools MCP 导航到目标根页面，不使用静态 HTTP 请求代替真实页面。
 - 用 `evaluate_script` 依次注入 `JsEnv_Dev.js` 和 `generated/jsrpc_inject.js`；若使用运行时探针，先注入探针再注入 JSRPC。
-- 验证：`curl http://127.0.0.1:12080/list`
+- 验证：`curl http://127.0.0.1:12080/list` 只能证明服务端口可访问，不能代替 action 级 smoke test。
 - 调用 JSRPC 后必须检查 `plaintext`、最终 `request.url`、`requestBody`、`status` 和最终 `response`；仅出现函数名或候选分数不得判定通过。
+- 将真实 action 结果保存为 `artifacts/jsrpc_smoke.json`，执行 `python3 scripts/validate_browser_evidence.py --input artifacts/jsrpc_smoke.json --output artifacts/browser_evidence.json`；能取得桥接状态时加 `--require-session`。验证失败时不得进入“验证通过”的正式输出。
+- Flask 验证必须额外提交一份外层 `application/octet-stream` 的完整 HTTP 报文，确认返回完整报文、目标字段已替换且 `Content-Length` 正确；同时保留 `dataBody` wrapper 回归。
 - 标准捕获层同时覆盖 `fetch` 与 `XMLHttpRequest`；若成功响应会触发页面跳转，在分析配置中使用 `capture.suppress_page_success=true`，只抑制 `fetch` 测试页面的后续跳转，仍记录真实响应。XHR 成功响应只采集不改写。
 
 ### 可复制验证命令

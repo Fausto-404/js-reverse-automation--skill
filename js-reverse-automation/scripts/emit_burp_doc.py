@@ -71,8 +71,8 @@ def main() -> int:
 
 1. 仅匹配授权目标 URL。
 2. 请求方向使用 `direction=request`，响应解密使用 `direction=response`。
-3. 将原始 body 作为 HTTP POST body 发送。
-4. JSON 请求应传递原始 Content-Type；可使用 `X-JSRA-Content-Type` 覆盖。
+3. 在 autoDecoder 页面直接粘贴完整 HTTP 请求/响应时，插件可能以 `application/octet-stream` 调用接口；代理会从内层报文自动识别真实 `Content-Type`，并返回完整改写后的报文。
+4. 使用 `dataBody/dataHeaders` wrapper 时，`dataBody` 传 body，`dataHeaders` 传可选头部；JSON 请求也可用 `X-JSRA-Content-Type` 覆盖。
 5. 首次联调前访问 `/health`。
 6. 发生 `JSRA_ERROR` 时不要继续发送被破坏的请求。
 7. 不要把页面抓到的公钥、模数或某次样本结果改写成 Python 加密实现。
@@ -92,7 +92,7 @@ def main() -> int:
 | 请求自动 base64 解码 | 只有服务端要求先解码 Base64 时才选 |
 | Proxy、Repeater 等模块真实调试 | 联调时可选，用于观察返回的完整数据包 |
 
-加密接口和解密接口可以同时配置。请求方向调试时，在“原始数据包”区域粘贴完整 HTTP 请求并选择“请求数据包”；响应方向调试时切换为“响应数据包”，再粘贴完整 HTTP 响应，两个方向不能同时选。autoDecoder 实际通过表单字段调用接口：`dataBody` 传请求体，勾选“处理请求头”时再传 `dataHeaders`，并传 `requestorresponse=request` 或 `response`。未处理请求头时接口只返回改写后的 body；处理请求头时必须返回 `headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + body`，这是 autoDecoder 的固定返回格式。生成的 Flask 代理已兼容该协议。
+加密接口和解密接口可以同时配置。请求方向调试时，在“原始数据包”区域粘贴完整 HTTP 请求并选择“请求数据包”；响应方向调试时切换为“响应数据包”，再粘贴完整 HTTP 响应，两个方向不能同时选。对于截图中的整包模式，接口收到的是完整 HTTP 报文，外层常见 `Content-Type: application/octet-stream`；代理会解析内层 `Content-Type`、替换 body，并同步 `Content-Length`。对于 wrapper 模式，autoDecoder 通过 `dataBody` 传请求体，勾选“处理请求头”时额外传 `dataHeaders`，并传 `requestorresponse=request` 或 `response`。未处理请求头时整包模式返回完整改写报文，wrapper 模式返回改写后的 body；处理请求头时必须返回 `headers + "\\r\\n\\r\\n\\r\\n\\r\\n" + body`，这是 autoDecoder 的固定返回格式。
 
 响应解密时使用已配置的 `{decode_url}`，切换为“响应数据包”后进行测试；如果当前只验证请求加密，也可以保留解密接口配置不使用。
 
@@ -140,7 +140,15 @@ curl --noproxy '*' -sS -X POST {encode_url} \\
 
 ### 完整 HTTP 数据包调试
 
-生成的 `/encode` 和 `/decode` 也支持直接提交完整 HTTP 数据包，便于脱离 Burp 页面调试；该模式会拆分请求头和请求体，并自动更新 `Content-Length`。
+生成的 `/encode` 和 `/decode` 也支持直接提交完整 HTTP 数据包，便于脱离 Burp 页面调试；该模式会拆分请求头和请求体，并自动更新 `Content-Length`。整包验证示例：
+
+```bash
+curl --noproxy '*' -sS -X POST {encode_url} \\
+  -H 'Content-Type: application/octet-stream' \\
+  --data-binary $'POST /newlogin/login.do?appName=arena&fromSite=77 HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Type: application/x-www-form-urlencoded\\r\\n\\r\\nloginId=admin&password2=123456'
+```
+
+预期返回完整 HTTP 请求，且只替换目标字段；若返回 `JSRA_ERROR`，先检查 JSRPC action 是否仍注册在当前浏览器页面。
 
 ### 兼容方式：dataBody/dataHeaders
 

@@ -29,6 +29,8 @@ JSRPC 验证输出必须能证明完整链路：`plaintext`、最终目标 `rout
 | `artifacts/source_analysis.json` | 人工分析 | 源码分析 |
 | `artifacts/quarantine.json` | `quarantine.py` | 隔离报告 |
 | `artifacts/validation_report.json` | `validate_artifacts.py` | 验证报告 |
+| `artifacts/delivery_contract.json` | `check_delivery_contract.py` | JSRPC 地址、Burp 整包和 wrapper 回归报告 |
+| `artifacts/browser_evidence.json` | `validate_browser_evidence.py` | action 级真实浏览器/JSRPC 结果验收 |
 | `artifacts/adversarial_trace.json` | `adversarial_runtime_probe.js` | 对抗运行时事件、Patch、Realm 和健康状态 |
 | `artifacts/adversarial_diff.json` | `adversarial_diff.py` | 基线与干预差分 |
 | `artifacts/source_instrumentation_report.json` | `source_instrumentor.js` | 源码级保守插桩报告 |
