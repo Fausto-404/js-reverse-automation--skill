@@ -62,6 +62,16 @@ def validate(payload: Any, require_session: bool = False) -> dict[str, Any]:
         return {"passed": False, "reason": "top_level_object_required"}
 
     result = payload.get("result", payload)
+    # Legacy JSRPC /go responses commonly serialize the action result in the
+    # outer ``data`` field.  Decode that envelope before checking evidence;
+    # an undecoded transport wrapper is not itself a missing business result.
+    if isinstance(result, dict) and isinstance(result.get("data"), str):
+        try:
+            decoded = json.loads(result["data"])
+        except (TypeError, ValueError):
+            decoded = None
+        if isinstance(decoded, dict):
+            result = decoded
     if isinstance(result, dict) and isinstance(result.get("data"), dict):
         data = result["data"]
     elif isinstance(result, dict):
