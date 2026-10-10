@@ -54,6 +54,25 @@
 
 * **从“单次对话记忆”到“经验持续演进”** ：
   打破“新对话即白纸”的限制。利用 `references/evolution_matrix.json` 记忆库，允许 AI 跨任务沉淀对抗经验，实现技能包针对新型混淆与反调试的持续自我演进。
+---
+
+## 赞助支持
+
+### js-reverse-automation × Infistar.cc 无限星河 | 全模型 API · 助力 JS 逆向自动化
+
+<img width="1360" height="160" alt="a8f1d14a4d7d6e81d15a451dd5cef2b4" src="https://github.com/user-attachments/assets/8f06d386-0f2d-4409-bc0e-f9ed38df1e65" />
+
+感谢 **Infistar.cc 无限星河** 赞助本项目！
+
+⚡ **稳定低价的模型服务**：价格低至官方渠道 0.1 折，模型倍率公开透明，多节点冗余与智能路由，有效降低限流、429 与服务中断的影响；
+
+💬 **主流模型一站式接入**：一个 API Key 即可调用 Claude、GPT、Gemini、DeepSeek 等主流模型，无缝适配 Claude Code、Codex 及本项目 MCP 工作流；
+
+🕵️ **JS 逆向长流程降本**：面向数万行混淆 JavaScript 分析与 Phase 0–9 自动化流程，结合本项目上下文精简机制，减少 Token 消耗，降低长时间逆向任务的运行成本；
+
+🎁 **项目用户专属福利**：通过 [**专属推广链接**](https://www.infistar.cc/register?aff=FUYA27UM&ref_source=link) 注册即可领取 **$5 测试额度及首充特惠**，快速体验多模型 API 服务！
+
+
 
 ## 流程设计思路
 针对js逆向中常用的远程调用法进行js逆向（如JSRPC+Mitmproxy、JSRPC+Flask等）中，初始配置阶段中面对的定位加密函数、编写注册代码、编写python代码等繁琐操作，通过引入AI的MCP和Skill技术进行赋能，让AI自动完成函数发现与注册代码生成，最终实现从“半自动”到“高自动”的跨越，人员全程只需下方指令，并最终配置一下burp即可完成JS逆向的全流程。
@@ -193,10 +212,14 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - autoDecoder：https://github.com/f0ng/autoDecoder 
 - chrome-devtools-mcp：https://github.com/ChromeDevTools/chrome-devtools-mcp/ 
 
+、
 ## 更新日志
 
-### v2.2（2026-09-18）
+<details>
+<summary><strong>v2.2（2026-09-18）｜运行时对抗与完整交付升级</strong></summary>
+
 从“扩展观测与结果验证”进一步升级为“可持续对抗、可证明成功、可直接交付”的完整闭环，面向通用浏览器逆向流程提供统一能力支撑。
+
 - **运行时对抗能力升级**：统一观测反调试、完整性校验、环境属性、动态代码、多 Realm 与加载器行为；通过持久 Hook 和统一编排器支持探针叠加、外部替换后的重建以及安全卸载，提升复杂混淆环境下的持续取证能力。
 - **JSVMP 与重度混淆分析升级**：增加保守的源码级属性 tap，建立插桩位置、运行时热点和调用结果之间的关联；结合基线/干预差分，形成静态分析与运行时行为的联合证据。
 - **真实浏览器会话升级**：绑定 tab 与 document 身份，管理导航、断线、超时和暂停等会话生命周期；观测控制台清理、历史导航、存储访问和页面关闭等控制流信号，并支持可回滚的受控干预。
@@ -204,7 +227,11 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - **传输与证据可靠性升级**：最终请求捕获统一覆盖 fetch 与 XMLHttpRequest；原始对象采用有界、循环引用安全的快照；兼容历史 JSRPC 外层字符串数据，提升 CryptoJS、JSEncrypt 等复杂对象和响应封装场景下的证据完整性。
 - **JSRPC/Flask/Burp 交付升级**：覆盖完整 HTTP 报文和包装请求模式，校验 `/go` 端点规范化、`application/octet-stream` 封装、`Content-Length` 重建和通用字段变换；保持请求/响应数据包互斥选择，同时支持分别配置解密接口与加密接口、端口占用回退和可复制验证命令。
 
-### v2.1 (2026-07-28)
+</details>
+
+<details>
+<summary><strong>v2.1（2026-07-28）｜证据驱动与 Token 优化</strong></summary>
+
 - **证据驱动**：SHA-256 指纹关联、证据图构建、差分验证，从"可能对"变成"确认对"
 - **扩展 Hook**：WebSocket/Request/TextEncoder/btoa/CryptoJS/JSEncrypt/sm2/sm3/sm4，覆盖更多加密场景
 - **降级策略链**：5 级降级，不轻易放弃，模块内部加密也能处理
@@ -212,16 +239,27 @@ Optional Fetch Example: fetch("https://xxx.com/api/login", {"body":"...","method
 - **Token 优化**：SKILL.md 精简 84%，参考资料按需加载，初始加载总 token 约减少 95%
 - **新增工具**：反爬分类、加密算法识别、Hook 模板库、环境补丁、AST 分析、隔离报告
 
-### v2.0 (2026-05-31)
+</details>
+
+<details>
+<summary><strong>v2.0（2026-05-31）｜自动化架构升级</strong></summary>
+
 - **架构优化**：阶段流程从 Phase 0-9 精简为 Phase 0-8，消除冗余步骤，token 消耗减少约**40%**
 - **全自动化**：JSRPC 自动发现/启动、Flask 自动启停、浏览器自动注入，**全程只需配置 Burp**
 - **更强入口定位**：运行时 Hook 探针 + Webpack 模块解析 + 7 维度候选评分，提供更强大、更快速的入口定位能力，**对模型要求降低**
 - **更稳定输出**：capability_boundary 显式声明不支持场景、runtime_health 健康检测、候选验证机制
 
-### v1版本更新记录
-- 2026-05-21: 引入 Phase 9 经验沉淀与对抗库演进
-- 2026-04-10: 补强请求复现、参数入口定位、反检测验证能力
-- 2026-03-19: 添加对抗 AI 识别为高风险操作的能力
-- 2026-03-10: 重构为"主控文件 + 参考规则 + 生成器 + 校验器"架构
-- 2026-02-11: 新增 11 个反调试补充技能
-- 2026-02-03: 优化项目结构，支持 Claude/Codex/Trae 平台
+</details>
+
+<details>
+<summary><strong>v1.x｜历史版本更新记录</strong></summary>
+
+- **2026-05-21**：引入 Phase 9 经验沉淀与对抗库演进
+- **2026-04-10**：补强请求复现、参数入口定位、反检测验证能力
+- **2026-03-19**：添加对抗 AI 识别为高风险操作的能力
+- **2026-03-10**：重构为"主控文件 + 参考规则 + 生成器 + 校验器"架构
+- **2026-02-11**：新增 11 个反调试补充技能
+- **2026-02-03**：优化项目结构，支持 Claude/Codex/Trae 平台
+
+</details>
+
